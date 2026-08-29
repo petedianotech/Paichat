@@ -368,7 +368,7 @@ fun ProfileScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = if (isDefaultSmsApp) "PulseChat is your main text app." else "Set PulseChat as your main text messaging app.",
+                            text = if (isDefaultSmsApp) "PaiChat is your main text app." else "Set PaiChat as your main text messaging app.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

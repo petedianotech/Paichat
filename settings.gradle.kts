@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "PulseChat"
+rootProject.name = "PaiChat"
 
 include(":app")

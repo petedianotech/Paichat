@@ -10,6 +10,7 @@ import com.example.data.repository.MessageRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -21,6 +22,17 @@ class HomeViewModel(
 ) : ViewModel() {
 
     val userProfile = userPreferences.userProfile
+    val isOnlineConnected: StateFlow<Boolean> = messageRepository.isOnlineConnected
+
+    init {
+        viewModelScope.launch {
+            userPreferences.userProfile.collectLatest { profile ->
+                if (profile.phoneNumber.isNotBlank()) {
+                    messageRepository.startOnlineSync(profile.phoneNumber)
+                }
+            }
+        }
+    }
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

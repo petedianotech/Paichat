@@ -14,12 +14,13 @@ import com.example.data.local.entity.ConversationEntity
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
+import com.example.data.remote.OnlineChatManager
 import com.example.data.sync.SmsSyncHelper
 import com.example.ui.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -31,6 +32,17 @@ class MessageRepository(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val smsSyncHelper = SmsSyncHelper(context, conversationDao, messageDao, contactRepository)
+    val onlineChatManager = OnlineChatManager(context, conversationDao, messageDao, contactRepository)
+
+    val isOnlineConnected: StateFlow<Boolean> = onlineChatManager.isOnlineConnected
+
+    fun startOnlineSync(myPhoneNumber: String) {
+        onlineChatManager.start(myPhoneNumber)
+    }
+
+    fun stopOnlineSync() {
+        onlineChatManager.stop()
+    }
 
     fun getAllConversations(): Flow<List<ConversationEntity>> =
         conversationDao.getAllConversations()
@@ -72,7 +84,7 @@ class MessageRepository(
             lastMessage = if (mediaUrl != null) "Photo" else content,
             lastMessageTimestamp = timestamp,
             unreadCount = 0,
-            isInternetUser = isInternet
+            isInternetUser = (messageType == MessageType.INTERNET || isInternet)
         )
         conversationDao.insertConversation(updatedConversation)
 
@@ -96,7 +108,15 @@ class MessageRepository(
         // 3. Process dispatch based on message type
         if (messageType == MessageType.INTERNET) {
             scope.launch {
-                simulateInternetSendProcess(messageId, conversationId, recipientPhone)
+                val myName = existingConversation?.contactName ?: "User"
+                onlineChatManager.sendOnlineMessage(
+                    messageId = messageId,
+                    senderPhone = senderPhone,
+                    senderName = myName,
+                    recipientPhone = recipientPhone,
+                    content = content,
+                    mediaUrl = mediaUrl
+                )
             }
         } else {
             scope.launch {
@@ -105,14 +125,6 @@ class MessageRepository(
         }
 
         return message
-    }
-
-    private suspend fun simulateInternetSendProcess(messageId: String, conversationId: String, recipientPhone: String) {
-        delay(400)
-        messageDao.updateMessageStatus(messageId, MessageStatus.SENT)
-
-        delay(400)
-        messageDao.updateMessageStatus(messageId, MessageStatus.DELIVERED)
     }
 
     private suspend fun sendSmsMessageProcess(messageId: String, recipientPhone: String, content: String) {

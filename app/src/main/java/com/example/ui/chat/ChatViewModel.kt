@@ -27,6 +27,7 @@ class ChatViewModel(
 ) : ViewModel() {
 
     val userProfile = userPreferences.userProfile
+    val isOnlineConnected: StateFlow<Boolean> = messageRepository.isOnlineConnected
 
     private val _conversation = MutableStateFlow<ConversationEntity?>(null)
     val conversation: StateFlow<ConversationEntity?> = _conversation.asStateFlow()

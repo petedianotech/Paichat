@@ -66,7 +66,7 @@ fun NewChatScreen(
     val searchQuery by viewModel.phoneSearchQuery.collectAsState()
     val contacts by viewModel.contactsList.collectAsState()
 
-    val isTypedNumberPulseChat = searchQuery.isNotBlank() && viewModel.isSearchNumberPulseChatUser(searchQuery)
+    val isTypedNumberPaiChat = searchQuery.isNotBlank() && viewModel.isSearchNumberPaiChatUser(searchQuery)
 
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -122,7 +122,7 @@ fun NewChatScreen(
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
                         .clickable {
-                            val contact = viewModel.addCustomContact(searchQuery, isTypedNumberPulseChat)
+                            val contact = viewModel.addCustomContact(searchQuery, isTypedNumberPaiChat)
                             onSelectContact(contact.phoneNumber)
                         }
                         .testTag("start_custom_chat_card"),
@@ -148,7 +148,7 @@ fun NewChatScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (isTypedNumberPulseChat) "Free Internet Chat enabled" else "Regular text message (SMS)",
+                                text = if (isTypedNumberPaiChat) "Online chat enabled" else "Text message (SMS)",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

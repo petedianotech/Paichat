@@ -92,6 +92,7 @@ fun ChatThreadScreen(
     val messages by viewModel.messages.collectAsState()
     val inputText by viewModel.inputText.collectAsState()
     val isForcedSms by viewModel.isForcedSms.collectAsState()
+    val isOnlineConnected by viewModel.isOnlineConnected.collectAsState()
     val reactions by viewModel.reactions.collectAsState()
     val userProfile by viewModel.userProfile.collectAsState()
 
@@ -101,7 +102,7 @@ fun ChatThreadScreen(
 
     val listState = rememberLazyListState()
 
-    val isInternet = (conversation?.isInternetUser == true) && !isForcedSms
+    val isInternet = (conversation?.isInternetUser == true || isOnlineConnected) && !isForcedSms
 
     val emojiList = listOf("❤️", "👍", "😂", "😮", "😢", "🔥")
 
@@ -164,11 +165,20 @@ fun ChatThreadScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
-                            Text(
-                                text = if (isInternet) "Internet Chat (Online)" else "Regular Text (SMS)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (isInternet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isInternet) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isInternet) "Online Chat" else "Text Message (SMS)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isInternet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 },
@@ -178,12 +188,31 @@ fun ChatThreadScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.toggleForcedSms() }) {
-                        Icon(
-                            imageVector = Icons.Default.Sms,
-                            contentDescription = "Toggle SMS",
-                            tint = if (isForcedSms) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Surface(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { viewModel.toggleForcedSms() },
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isInternet) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isInternet) Icons.Default.SentimentSatisfiedAlt else Icons.Default.Sms,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (isInternet) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isInternet) "Online" else "SMS",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (isInternet) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             )
@@ -236,7 +265,7 @@ fun ChatThreadScreen(
                                 decorationBox = { innerTextField ->
                                     if (inputText.isEmpty()) {
                                         Text(
-                                            text = if (isInternet) "Type an internet message..." else "Type a text message (SMS)...",
+                                            text = if (isInternet) "Type an online message..." else "Type a text message (SMS)...",
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

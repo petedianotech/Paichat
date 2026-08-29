@@ -47,7 +47,7 @@ class NewChatViewModel(
         }
     }
 
-    fun isSearchNumberPulseChatUser(phone: String): Boolean {
+    fun isSearchNumberPaiChatUser(phone: String): Boolean {
         return contactRepository.isContactInternetUser(phone)
     }
 
@@ -57,7 +57,7 @@ class NewChatViewModel(
             name = phone,
             avatarId = "avatar_1",
             isInternetUser = isInternet,
-            statusText = if (isInternet) "Internet Chat (Online)" else "Regular Text (SMS)"
+            statusText = if (isInternet) "Online Chat" else "Text Message (SMS)"
         )
         contactRepository.addOrUpdateContact(contact)
         return contact

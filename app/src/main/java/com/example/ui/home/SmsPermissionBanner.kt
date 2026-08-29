@@ -99,7 +99,7 @@ fun SmsPermissionBanner(
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Text(
-                        text = "Allow PulseChat to read and send regular text messages on your phone.",
+                        text = "Allow PaiChat to read and send regular text messages on your phone.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                     )

@@ -61,7 +61,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun PulseChatTheme(
+fun PaiChatTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
@@ -80,4 +80,13 @@ fun PulseChatTheme(
         typography = Typography,
         content = content
     )
+}
+
+@Composable
+fun PulseChatTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    PaiChatTheme(darkTheme, dynamicColor, content)
 }

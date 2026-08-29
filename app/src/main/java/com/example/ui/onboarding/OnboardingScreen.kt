@@ -122,14 +122,14 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Welcome to PulseChat",
+                text = "Welcome to PaiChat",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
-                text = "Fast internet chat and normal text messages in one place.",
+                text = "Free online chat and standard text messages together.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -249,7 +249,7 @@ fun OnboardingScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = if (isDefaultSmsApp) "PulseChat is your main text message app." else "Make PulseChat your main text app to send and receive SMS.",
+                            text = if (isDefaultSmsApp) "PaiChat is your main text message app." else "Make PaiChat your main text app to send and receive SMS.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

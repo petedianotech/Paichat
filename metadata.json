@@ -1,6 +1,6 @@
 {
-  "name": "PulseChat",
-  "description": "Production-grade hybrid Internet and SMS messaging application with Material 3 design.",
+  "name": "PaiChat",
+  "description": "Simple and fast mobile messaging app for free internet chat and regular text messages.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
