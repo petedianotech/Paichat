@@ -71,6 +71,18 @@ class ProfileViewModel(
         _syncMessage.value = null
     }
 
+    fun setThemeMode(mode: String) {
+        userPreferences.setThemeMode(mode)
+    }
+
+    fun setColorTheme(color: String) {
+        userPreferences.setColorTheme(color)
+    }
+
+    fun setChatWallpaper(wallpaper: String) {
+        userPreferences.setChatWallpaper(wallpaper)
+    }
+
     fun updateProfile(name: String, phone: String, avatar: String) {
         userPreferences.saveProfile(phone, name, avatar)
     }

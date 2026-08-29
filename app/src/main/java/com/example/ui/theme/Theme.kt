@@ -62,17 +62,27 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun PaiChatTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    themeMode: String = "SYSTEM",
+    colorTheme: String = "BLUE",
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = when (themeMode) {
+        "LIGHT" -> false
+        "DARK" -> true
+        else -> isSystemDark
+    }
+
+    val baseScheme = if (isDark) DarkColorScheme else LightColorScheme
+
+    val colorScheme = when (colorTheme) {
+        "TEAL" -> if (isDark) baseScheme.copy(primary = PrimaryTealDark, primaryContainer = PrimaryTealContainerDark, onPrimaryContainer = OnPrimaryTealContainerDark)
+                  else baseScheme.copy(primary = PrimaryTealLight, primaryContainer = PrimaryTealContainerLight, onPrimaryContainer = OnPrimaryTealContainerLight)
+        "PURPLE" -> if (isDark) baseScheme.copy(primary = PrimaryPurpleDark, primaryContainer = PrimaryPurpleContainerDark, onPrimaryContainer = OnPrimaryPurpleContainerDark)
+                    else baseScheme.copy(primary = PrimaryPurpleLight, primaryContainer = PrimaryPurpleContainerLight, onPrimaryContainer = OnPrimaryPurpleContainerLight)
+        "EMERALD" -> if (isDark) baseScheme.copy(primary = PrimaryEmeraldDark, primaryContainer = PrimaryEmeraldContainerDark, onPrimaryContainer = OnPrimaryEmeraldContainerDark)
+                     else baseScheme.copy(primary = PrimaryEmeraldLight, primaryContainer = PrimaryEmeraldContainerLight, onPrimaryContainer = OnPrimaryEmeraldContainerLight)
+        else -> baseScheme
     }
 
     MaterialTheme(
@@ -88,5 +98,9 @@ fun PulseChatTheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    PaiChatTheme(darkTheme, dynamicColor, content)
+    PaiChatTheme(
+        themeMode = if (darkTheme) "DARK" else "LIGHT",
+        colorTheme = "BLUE",
+        content = content
+    )
 }

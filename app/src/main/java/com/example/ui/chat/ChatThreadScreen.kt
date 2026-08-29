@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -330,11 +332,28 @@ fun ChatThreadScreen(
             }
         }
     ) { paddingValues ->
+        val wallpaperRes = when (userProfile.chatWallpaper) {
+            "SUBTLE" -> com.example.R.drawable.img_wallpaper_subtle
+            "DOODLE" -> com.example.R.drawable.img_wallpaper_doodle
+            "NATURE" -> com.example.R.drawable.img_wallpaper_nature
+            else -> null
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            if (wallpaperRes != null) {
+                Image(
+                    painter = painterResource(id = wallpaperRes),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    alpha = 0.35f
+                )
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),

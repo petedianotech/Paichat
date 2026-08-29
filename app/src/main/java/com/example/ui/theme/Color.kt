@@ -2,11 +2,36 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Brand Colors (PulseChat Blue)
+// Primary Brand Colors (PaiChat Blue)
 val PrimaryLight = Color(0xFF005AC1)
 val OnPrimaryLight = Color(0xFFFFFFFF)
 val PrimaryContainerLight = Color(0xFFD8E2FF)
 val OnPrimaryContainerLight = Color(0xFF001A41)
+
+// Teal Theme
+val PrimaryTealLight = Color(0xFF006A67)
+val PrimaryTealContainerLight = Color(0xFF9CF1EC)
+val OnPrimaryTealContainerLight = Color(0xFF00201F)
+val PrimaryTealDark = Color(0xFF4CF6EE)
+val PrimaryTealContainerDark = Color(0xFF00504E)
+val OnPrimaryTealContainerDark = Color(0xFF9CF1EC)
+
+// Purple Theme
+val PrimaryPurpleLight = Color(0xFF6B4FA0)
+val PrimaryPurpleContainerLight = Color(0xFFEBDCFF)
+val OnPrimaryPurpleContainerLight = Color(0xFF260058)
+val PrimaryPurpleDark = Color(0xFFD4BBFF)
+val PrimaryPurpleContainerDark = Color(0xFF523786)
+val OnPrimaryPurpleContainerDark = Color(0xFFEBDCFF)
+
+// Emerald Theme
+val PrimaryEmeraldLight = Color(0xFF1B6C43)
+val PrimaryEmeraldContainerLight = Color(0xFFA5F5BE)
+val OnPrimaryEmeraldContainerLight = Color(0xFF002110)
+val PrimaryEmeraldDark = Color(0xFF8CD8A4)
+val PrimaryEmeraldContainerDark = Color(0xFF00522C)
+val OnPrimaryEmeraldContainerDark = Color(0xFFA5F5BE)
+
 
 val SecondaryLight = Color(0xFF535F70)
 val OnSecondaryLight = Color(0xFFFFFFFF)
