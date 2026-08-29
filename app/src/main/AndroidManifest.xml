@@ -49,7 +49,7 @@
             android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.SMS_DELIVERED" />
+                <action android:name="android.provider.Telephony.SMS_DELIVER" />
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
@@ -60,8 +60,20 @@
             android:exported="true"
             android:permission="android.permission.BROADCAST_WAP_PUSH">
             <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVERED" />
+                <action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" />
                 <data android:mimeType="application/vnd.wap.mms-message" />
+            </intent-filter>
+        </receiver>
+
+        <!-- BroadcastReceiver for SMS sent/delivered status tracking -->
+        <receiver
+            android:name=".receiver.SmsStatusReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.SMS_SENT" />
+                <action android:name="com.example.SMS_DELIVERED" />
+                <data android:scheme="sms-sent" />
+                <data android:scheme="sms-delivered" />
             </intent-filter>
         </receiver>
 

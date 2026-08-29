@@ -110,4 +110,10 @@ class ChatViewModel(
             messageRepository.fallbackToSendAsSms(messageId)
         }
     }
+
+    fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            messageRepository.deleteMessage(messageId)
+        }
+    }
 }

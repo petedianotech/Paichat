@@ -27,6 +27,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.Context
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -36,6 +39,10 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
 import androidx.compose.material3.Card
@@ -365,33 +372,139 @@ fun ChatThreadScreen(
                 }
             }
 
-            // Emoji Reaction Bar Popup
+            // Comprehensive Message Action Bar/Dialog Popup
             selectedMessageForReaction?.let { msg ->
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
+                        .background(Color.Black.copy(alpha = 0.5f))
                         .clickable { selectedMessageForReaction = null },
                     contentAlignment = Alignment.Center
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(28.dp),
+                        shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.surface,
                         tonalElevation = 8.dp,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier
+                            .widthIn(max = 300.dp)
+                            .padding(24.dp)
+                            .clickable(enabled = false) {} // Disable clicks passing through to dismiss
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            emojiList.forEach { emoji ->
-                                Text(
-                                    text = emoji,
-                                    fontSize = 28.sp,
-                                    modifier = Modifier.clickable {
-                                        viewModel.addReaction(msg.messageId, emoji)
+                            // Reaction Title
+                            Text(
+                                text = "Reactions",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            // Reaction Row
+                            Row(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                emojiList.forEach { emoji ->
+                                    Text(
+                                        text = emoji,
+                                        fontSize = 26.sp,
+                                        modifier = Modifier
+                                            .clickable {
+                                                viewModel.addReaction(msg.messageId, emoji)
+                                                selectedMessageForReaction = null
+                                            }
+                                            .padding(4.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Copy text action
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        try {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("SMS Message", msg.content)
+                                            clipboard.setPrimaryClip(clip)
+                                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Failed to copy", Toast.LENGTH_SHORT).show()
+                                        }
                                         selectedMessageForReaction = null
                                     }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = "Copy Text",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // Retry action (Only for failed messages)
+                            if (msg.status == com.example.data.local.entity.MessageStatus.FAILED) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            executeWithSmsPermission {
+                                                viewModel.fallbackToSendAsSms(msg.messageId)
+                                            }
+                                            selectedMessageForReaction = null
+                                        }
+                                        .padding(vertical = 12.dp, horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Retry",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text(
+                                        text = "Retry Sending",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            // Delete action
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.deleteMessage(msg.messageId)
+                                        selectedMessageForReaction = null
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = "Delete Message",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         }

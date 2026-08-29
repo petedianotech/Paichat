@@ -44,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import com.example.ui.theme.LocalThemeGradient
 import com.example.ui.util.AvatarUtil
 
@@ -61,6 +63,7 @@ fun HomeScreen(
     val userProfile by viewModel.userProfile.collectAsState()
 
     var isSearchActive by remember { mutableStateOf(false) }
+    var conversationToDelete by remember { mutableStateOf<com.example.data.local.entity.ConversationEntity?>(null) }
 
     val backgroundGradient = LocalThemeGradient.current
 
@@ -191,12 +194,37 @@ fun HomeScreen(
                     ) { conversation ->
                         ConversationItem(
                             conversation = conversation,
-                            onClick = { onNavigateToChat(conversation.conversationId) }
+                            onClick = { onNavigateToChat(conversation.conversationId) },
+                            onLongClick = { conversationToDelete = conversation }
                         )
                     }
                 }
             }
         }
+    }
+
+    // Delete Conversation confirmation dialog
+    conversationToDelete?.let { conversation ->
+        AlertDialog(
+            onDismissRequest = { conversationToDelete = null },
+            title = { Text("Delete Conversation") },
+            text = { Text("Are you sure you want to delete the conversation with ${conversation.contactName ?: conversation.phoneNumber}? All messages will be permanently removed.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteConversation(conversation.conversationId)
+                        conversationToDelete = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { conversationToDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 }

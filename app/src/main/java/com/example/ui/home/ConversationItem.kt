@@ -37,12 +37,16 @@ import com.example.data.local.entity.ConversationEntity
 import com.example.ui.theme.SmsBadgeBgLight
 import com.example.ui.theme.SmsBadgeTextLight
 import com.example.ui.util.AvatarUtil
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import com.example.ui.util.TimeFormatter
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConversationItem(
     conversation: ConversationEntity,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val contactName = conversation.contactName ?: conversation.phoneNumber
     val avatarColor = AvatarUtil.getAvatarColor(conversation.phoneNumber)
@@ -52,7 +56,10 @@ fun ConversationItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .testTag("conversation_item_${conversation.conversationId}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(

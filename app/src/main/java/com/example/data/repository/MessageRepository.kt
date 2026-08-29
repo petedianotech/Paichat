@@ -1,9 +1,12 @@
 package com.example.data.repository
 
 import android.Manifest
+import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
@@ -16,6 +19,7 @@ import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
 import com.example.data.remote.OnlineChatManager
 import com.example.data.sync.SmsSyncHelper
+import com.example.receiver.SmsStatusReceiver
 import com.example.ui.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -148,14 +152,38 @@ class MessageRepository(
                 SmsManager.getDefault()
             }
 
-            val parts = smsManager?.divideMessage(content)
-            if (parts != null && parts.size > 1) {
-                smsManager.sendMultipartTextMessage(recipientPhone, null, parts, null, null)
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             } else {
-                smsManager?.sendTextMessage(recipientPhone, null, content, null, null)
+                PendingIntent.FLAG_UPDATE_CURRENT
             }
 
-            messageDao.updateMessageStatus(messageId, MessageStatus.SENT)
+            val sentIntent = PendingIntent.getBroadcast(
+                context,
+                messageId.hashCode(),
+                Intent("com.example.SMS_SENT", Uri.parse("sms-sent://$messageId"), context, SmsStatusReceiver::class.java),
+                flags
+            )
+
+            val deliveryIntent = PendingIntent.getBroadcast(
+                context,
+                messageId.hashCode(),
+                Intent("com.example.SMS_DELIVERED", Uri.parse("sms-delivered://$messageId"), context, SmsStatusReceiver::class.java),
+                flags
+            )
+
+            val parts = smsManager?.divideMessage(content) ?: ArrayList<String>().apply { add(content) }
+            if (parts.size > 1) {
+                val sentIntents = ArrayList<PendingIntent>()
+                val deliveryIntents = ArrayList<PendingIntent>()
+                for (i in parts.indices) {
+                    sentIntents.add(sentIntent)
+                    deliveryIntents.add(deliveryIntent)
+                }
+                smsManager?.sendMultipartTextMessage(recipientPhone, null, parts, sentIntents, deliveryIntents)
+            } else {
+                smsManager?.sendTextMessage(recipientPhone, null, content, sentIntent, deliveryIntent)
+            }
 
             // Save to system sent box if permitted
             try {
@@ -171,12 +199,7 @@ class MessageRepository(
                 // Safe ignore if permission/provider is locked
             }
         } catch (_: Exception) {
-            // Update status based on execution outcome
-            if (hasSendPermission) {
-                messageDao.updateMessageStatus(messageId, MessageStatus.SENT)
-            } else {
-                messageDao.updateMessageStatus(messageId, MessageStatus.FAILED)
-            }
+            messageDao.updateMessageStatus(messageId, MessageStatus.FAILED)
         }
     }
 
@@ -245,5 +268,9 @@ class MessageRepository(
     suspend fun deleteConversation(conversationId: String) {
         messageDao.deleteMessagesForConversation(conversationId)
         conversationDao.deleteConversationById(conversationId)
+    }
+
+    suspend fun deleteMessage(messageId: String) {
+        messageDao.deleteMessageById(messageId)
     }
 }
