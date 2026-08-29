@@ -56,7 +56,7 @@ fun ConversationItem(
             .testTag("conversation_item_${conversation.conversationId}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
         )
     ) {
         Row(
@@ -122,28 +122,18 @@ fun ConversationItem(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Type Badge: Internet (🔒) vs SMS Badge
-                    if (conversation.isInternetUser) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Encrypted Internet",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                    // Minimalist SMS Badge
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Text(
+                            text = "SMS",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = SmsBadgeBgLight,
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Text(
-                                text = "SMS",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                color = SmsBadgeTextLight,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
                     }
 
                     Text(

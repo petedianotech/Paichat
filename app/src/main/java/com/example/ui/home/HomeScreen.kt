@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.ui.theme.LocalThemeGradient
 import com.example.ui.util.AvatarUtil
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,8 +62,16 @@ fun HomeScreen(
 
     var isSearchActive by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
+    val backgroundGradient = LocalThemeGradient.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundGradient)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -188,4 +198,5 @@ fun HomeScreen(
             }
         }
     }
+}
 }

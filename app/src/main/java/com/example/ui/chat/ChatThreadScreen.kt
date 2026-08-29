@@ -78,6 +78,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.data.local.entity.MessageEntity
 import com.example.ui.util.AvatarUtil
+import com.example.ui.theme.LocalThemeGradient
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -136,9 +137,17 @@ fun ChatThreadScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    val backgroundGradient = LocalThemeGradient.current
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundGradient)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
             TopAppBar(
                 title = {
                     val titleText = conversation?.contactName ?: conversation?.phoneNumber ?: "Chat"
@@ -172,13 +181,13 @@ fun ChatThreadScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(if (isInternet) Color(0xFF4CAF50) else MaterialTheme.colorScheme.outline)
+                                        .background(MaterialTheme.colorScheme.primary)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isInternet) "Online Chat" else "Text Message (SMS)",
+                                    text = "Text Message (SMS)",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (isInternet) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -187,34 +196,6 @@ fun ChatThreadScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    Surface(
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .clickable { viewModel.toggleForcedSms() },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isInternet) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = if (isInternet) Icons.Default.SentimentSatisfiedAlt else Icons.Default.Sms,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = if (isInternet) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = if (isInternet) "Online" else "SMS",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = if (isInternet) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
             )
@@ -469,59 +450,12 @@ fun ChatThreadScreen(
                                 }
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.toggleForcedSms()
-                                    showAttachmentSheet = false
-                                },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Sms,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Send as regular text (SMS)",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = if (isForcedSms) "Currently sending as SMS." else "Send as normal cellular SMS instead of internet chat.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Switch(
-                                    checked = isForcedSms,
-                                    onCheckedChange = {
-                                        viewModel.toggleForcedSms()
-                                        showAttachmentSheet = false
-                                    }
-                                )
-                            }
-                        }
                     }
                 }
             }
         }
     }
+}
 }
 
 @Composable

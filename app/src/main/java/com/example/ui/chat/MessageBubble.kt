@@ -83,20 +83,13 @@ fun MessageBubble(
         )
     }
 
-    // Color Theme Distinction: Primary for Internet, Secondary/Slate for SMS
-    val isInternet = message.messageType == MessageType.INTERNET
-
     val backgroundColor = when {
-        isFromMe && isInternet -> MaterialTheme.colorScheme.primary
-        isFromMe && !isInternet -> SmsBubbleLight
-        !isFromMe && isInternet -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
+        isFromMe -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
     }
 
     val contentColor = when {
-        isFromMe && isInternet -> MaterialTheme.colorScheme.onPrimary
-        isFromMe && !isInternet -> MaterialTheme.colorScheme.onSurface
-        !isFromMe && isInternet -> MaterialTheme.colorScheme.onPrimaryContainer
+        isFromMe -> MaterialTheme.colorScheme.onPrimary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
@@ -144,27 +137,11 @@ fun MessageBubble(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Bottom row: SMS badge + timestamp + status tick
+                // Bottom row: timestamp + status tick
                 Row(
                     modifier = Modifier.align(Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // SMS Badge for cellular messages
-                    if (!isInternet) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = if (isFromMe) SmsBadgeBgDark else SmsBadgeBgLight,
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            Text(
-                                text = "SMS",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                                color = if (isFromMe) SmsBadgeTextDark else SmsBadgeTextLight,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-
                     Text(
                         text = TimeFormatter.formatMessageTimestamp(message.timestamp),
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -203,7 +180,7 @@ fun MessageBubble(
                                     imageVector = Icons.Default.DoneAll,
                                     contentDescription = "Read",
                                     modifier = Modifier.size(14.dp),
-                                    tint = if (isInternet) Color(0xFF64B5F6) else contentColor
+                                    tint = contentColor
                                 )
                             }
                             MessageStatus.FAILED -> {

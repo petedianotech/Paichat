@@ -70,8 +70,8 @@ class MessageRepository(
         mediaUrl: String? = null
     ): MessageEntity {
         val conversationId = recipientPhone
-        val isInternet = contactRepository.isContactInternetUser(recipientPhone)
-        val messageType = forcedMessageType ?: if (isInternet) MessageType.INTERNET else MessageType.SMS
+        val isInternet = false
+        val messageType = MessageType.SMS
 
         // 1. Ensure conversation exists
         val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
@@ -84,7 +84,7 @@ class MessageRepository(
             lastMessage = if (mediaUrl != null) "Photo" else content,
             lastMessageTimestamp = timestamp,
             unreadCount = 0,
-            isInternetUser = (messageType == MessageType.INTERNET || isInternet)
+            isInternetUser = false
         )
         conversationDao.insertConversation(updatedConversation)
 
@@ -206,7 +206,7 @@ class MessageRepository(
         val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
 
         val unread = (existingConversation?.unreadCount ?: 0) + 1
-        val isInternet = contactRepository.isContactInternetUser(senderPhone) || messageType == MessageType.INTERNET
+        val isInternet = false
         val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
 
         val conversation = ConversationEntity(
@@ -216,7 +216,7 @@ class MessageRepository(
             lastMessage = if (mediaUrl != null) "Photo" else content,
             lastMessageTimestamp = timestamp,
             unreadCount = unread,
-            isInternetUser = isInternet
+            isInternetUser = false
         )
         conversationDao.insertConversation(conversation)
 

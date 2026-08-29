@@ -8,7 +8,15 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+
+val LocalThemeGradient = staticCompositionLocalOf<Brush> {
+    Brush.verticalGradient(colors = listOf(Color(0xFFF8F9FF), Color(0xFFF8F9FF)))
+}
 
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryLight,
@@ -85,11 +93,38 @@ fun PaiChatTheme(
         else -> baseScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val gradientBrush = when (colorTheme) {
+        "TEAL" -> if (isDark) {
+            Brush.verticalGradient(colors = listOf(Color(0xFF041817), Color(0xFF0C0E0E)))
+        } else {
+            Brush.verticalGradient(colors = listOf(Color(0xFFE2F9F8), Color(0xFFF3FEFE)))
+        }
+        "PURPLE" -> if (isDark) {
+            Brush.verticalGradient(colors = listOf(Color(0xFF130922), Color(0xFF0A0511)))
+        } else {
+            Brush.verticalGradient(colors = listOf(Color(0xFFF4E9FF), Color(0xFFFBF6FF)))
+        }
+        "EMERALD" -> if (isDark) {
+            Brush.verticalGradient(colors = listOf(Color(0xFF06180E), Color(0xFF030C07)))
+        } else {
+            Brush.verticalGradient(colors = listOf(Color(0xFFE8F8EE), Color(0xFFF4FBF7)))
+        }
+        else -> if (isDark) { // BLUE
+            Brush.verticalGradient(colors = listOf(Color(0xFF081225), Color(0xFF040810)))
+        } else {
+            Brush.verticalGradient(colors = listOf(Color(0xFFF0F5FF), Color(0xFFFAFCFF)))
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalThemeGradient provides gradientBrush
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
 
 @Composable
