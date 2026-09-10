@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +40,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -101,6 +103,7 @@ fun HomeScreen(
             .background(backgroundGradient)
     ) {
         Scaffold(
+            modifier = Modifier.imePadding(),
             containerColor = Color.Transparent,
             topBar = {
                 Column(
@@ -192,15 +195,43 @@ fun HomeScreen(
                 }
             },
             floatingActionButton = {
-                ExtendedFloatingActionButton(
-                    onClick = onNavigateToNewChat,
-                    icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text("Start chat", fontWeight = FontWeight.Bold) },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.testTag("start_chat_fab")
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Floating Quick Reply Bubble Launcher (Samsung Messages style)
+                    if (conversations.isNotEmpty()) {
+                        val latestConv = conversations.first()
+                        FloatingActionButton(
+                            onClick = {
+                                val popupIntent = Intent(context, com.example.ui.quickreply.QuickReplyActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                                    putExtra("conversationId", latestConv.conversationId)
+                                    putExtra("senderPhone", latestConv.phoneNumber)
+                                    putExtra("senderName", latestConv.contactName)
+                                    putExtra("initialMessage", latestConv.lastMessage)
+                                }
+                                context.startActivity(popupIntent)
+                            },
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            shape = CircleShape,
+                            modifier = Modifier.testTag("floating_quick_reply_bubble_btn")
+                        ) {
+                            Icon(Icons.Default.ChatBubbleOutline, contentDescription = "Floating Quick Reply")
+                        }
+                    }
+
+                    ExtendedFloatingActionButton(
+                        onClick = onNavigateToNewChat,
+                        icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                        text = { Text("Start chat", fontWeight = FontWeight.Bold) },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.testTag("start_chat_fab")
+                    )
+                }
             }
         ) { paddingValues ->
             Column(

@@ -11,8 +11,11 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material.icons.filled.ContactPage
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,9 +28,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -137,6 +143,8 @@ fun ChatThreadScreen(
     val reactions by viewModel.reactions.collectAsState()
     val appSettings by viewModel.appSettings.collectAsState()
     val delayedSendState by viewModel.delayedSendState.collectAsState()
+    val isRecordingVoice by viewModel.isRecordingVoice.collectAsState()
+    val recordingDurationSec by viewModel.recordingDurationSec.collectAsState()
 
     var selectedMessageForAction by remember { mutableStateOf<MessageEntity?>(null) }
     var showMessageInfoDialog by remember { mutableStateOf<MessageEntity?>(null) }
@@ -151,6 +159,26 @@ fun ChatThreadScreen(
 
     val listState = rememberLazyListState()
     val emojiList = listOf("❤️", "👍", "😂", "😮", "😢", "🔥")
+
+    // Zero-permission Android Photo Picker for MMS
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.sendMediaAttachment(context, uri.toString())
+        }
+    }
+
+    // Audio recording permission launcher
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.startVoiceRecording(context)
+        } else {
+            Toast.makeText(context, "Microphone permission is required for voice notes", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -178,6 +206,13 @@ fun ChatThreadScreen(
         viewModel.loadSims(context)
     }
 
+    val imeBottom = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0 && messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -199,6 +234,7 @@ fun ChatThreadScreen(
             .background(backgroundGradient)
     ) {
         Scaffold(
+            modifier = Modifier.imePadding(),
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
@@ -439,98 +475,174 @@ fun ChatThreadScreen(
                     }
 
                     // Input composer Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
+                    if (isRecordingVoice) {
+                        Row(
                             modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp),
-                            shape = RoundedCornerShape(26.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
+                            Surface(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .weight(1f)
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(26.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
                             ) {
-                                IconButton(onClick = { showAttachmentSheet = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Options & Attachments",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-
-                                IconButton(onClick = { showQuickResponseSheet = true }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Bolt,
-                                        contentDescription = "Quick Responses",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-
-                                BasicTextField(
-                                    value = inputText,
-                                    onValueChange = { viewModel.updateInputText(it) },
+                                Row(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = 6.dp)
-                                        .testTag("chat_input_field"),
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    ),
-                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                    decorationBox = { innerTextField ->
-                                        if (inputText.isEmpty()) {
-                                            Text(
-                                                text = "Text message (SMS)...",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                        innerTextField()
+                                        .fillMaxSize()
+                                        .padding(horizontal = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.error)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "Recording: ${String.format("%02d:%02d", recordingDurationSec / 60, recordingDurationSec % 60)}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
                                     }
-                                )
 
-                                IconButton(onClick = { viewModel.updateInputText(inputText + "😊") }) {
-                                    Icon(
-                                        imageVector = Icons.Default.SentimentSatisfiedAlt,
-                                        contentDescription = "Emoji",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    IconButton(onClick = { viewModel.cancelVoiceRecording() }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Cancel Recording",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                 }
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            FloatingActionButton(
+                                onClick = {
+                                    viewModel.stopAndSendVoiceRecording(context)
+                                },
+                                shape = CircleShape,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .testTag("send_voice_note_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send Voice Note",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(26.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(onClick = { showAttachmentSheet = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = "Options & Attachments",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
 
-                        Spacer(modifier = Modifier.width(8.dp))
+                                    IconButton(onClick = { showQuickResponseSheet = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Bolt,
+                                            contentDescription = "Quick Responses",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
 
-                        val isTyping = inputText.trim().isNotEmpty()
-                        FloatingActionButton(
-                            onClick = {
-                                if (isTyping) {
-                                    executeWithSmsPermission {
-                                        viewModel.initiateSendMessage(context)
+                                    BasicTextField(
+                                        value = inputText,
+                                        onValueChange = { viewModel.updateInputText(it) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 6.dp)
+                                            .testTag("chat_input_field"),
+                                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                        decorationBox = { innerTextField ->
+                                            if (inputText.isEmpty()) {
+                                                Text(
+                                                    text = "Text message (SMS)...",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+
+                                    IconButton(onClick = { viewModel.updateInputText(inputText + "😊") }) {
+                                        Icon(
+                                            imageVector = Icons.Default.SentimentSatisfiedAlt,
+                                            contentDescription = "Emoji",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
-                            },
-                            shape = CircleShape,
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                            modifier = Modifier
-                                .size(52.dp)
-                                .testTag("send_sms_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send SMS",
-                                modifier = Modifier.size(24.dp)
-                            )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            val isTyping = inputText.trim().isNotEmpty()
+                            FloatingActionButton(
+                                onClick = {
+                                    if (isTyping) {
+                                        executeWithSmsPermission {
+                                            viewModel.initiateSendMessage(context)
+                                        }
+                                    } else {
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                            viewModel.startVoiceRecording(context)
+                                        } else {
+                                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                },
+                                shape = CircleShape,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .testTag("send_sms_button")
+                            ) {
+                                Icon(
+                                    imageVector = if (isTyping) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic,
+                                    contentDescription = if (isTyping) "Send SMS" else "Record Voice Note",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -986,6 +1098,30 @@ fun ChatThreadScreen(
                                 horizontalArrangement = Arrangement.SpaceAround
                             ) {
                                 AttachmentGridItem(
+                                    icon = Icons.Default.Image,
+                                    label = "Photo Gallery",
+                                    onClick = {
+                                        showAttachmentSheet = false
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    }
+                                )
+
+                                AttachmentGridItem(
+                                    icon = Icons.Default.Mic,
+                                    label = "Voice Note",
+                                    onClick = {
+                                        showAttachmentSheet = false
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                            viewModel.startVoiceRecording(context)
+                                        } else {
+                                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
+                                    }
+                                )
+
+                                AttachmentGridItem(
                                     icon = Icons.Default.Schedule,
                                     label = "Schedule SMS",
                                     onClick = {
@@ -1002,21 +1138,28 @@ fun ChatThreadScreen(
                                         showQuickResponseSheet = true
                                     }
                                 )
+                            }
 
-                                AttachmentGridItem(
-                                    icon = Icons.Default.Image,
-                                    label = "Photo",
-                                    onClick = {
-                                        viewModel.initiateSendMessage(context, mediaUrl = "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=500&q=80")
-                                        showAttachmentSheet = false
-                                    }
-                                )
-
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceAround
+                            ) {
                                 AttachmentGridItem(
                                     icon = Icons.Default.LocationOn,
                                     label = "Location",
                                     onClick = {
                                         viewModel.updateInputText("📍 My Location: https://maps.google.com/?q=37.7749,-122.4194")
+                                        showAttachmentSheet = false
+                                    }
+                                )
+
+                                AttachmentGridItem(
+                                    icon = Icons.Default.ContactPage,
+                                    label = "Contact Card",
+                                    onClick = {
+                                        viewModel.updateInputText("👤 Contact: $contactDisplayName (${conversation?.phoneNumber})")
                                         showAttachmentSheet = false
                                     }
                                 )

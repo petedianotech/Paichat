@@ -14,7 +14,6 @@ import com.example.data.local.entity.MessageType
 import com.example.data.repository.ContactRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.UUID
 
 class SmsSyncHelper(
     private val context: Context,
@@ -38,51 +37,61 @@ class SmsSyncHelper(
                 Telephony.Sms.READ
             )
 
+            // Query all SMS messages, sorted descending by date
             val cursor = context.contentResolver.query(
                 Telephony.Sms.CONTENT_URI,
                 projection,
                 null,
                 null,
-                "${Telephony.Sms.DATE} DESC LIMIT 500"
+                "${Telephony.Sms.DATE} DESC"
             )
 
-            cursor?.use { c ->
-                val addressIdx = c.getColumnIndex(Telephony.Sms.ADDRESS)
-                val bodyIdx = c.getColumnIndex(Telephony.Sms.BODY)
-                val dateIdx = c.getColumnIndex(Telephony.Sms.DATE)
-                val typeIdx = c.getColumnIndex(Telephony.Sms.TYPE)
+            val idIdx = cursor?.getColumnIndex(Telephony.Sms._ID) ?: -1
+            val addressIdx = cursor?.getColumnIndex(Telephony.Sms.ADDRESS) ?: -1
+            val bodyIdx = cursor?.getColumnIndex(Telephony.Sms.BODY) ?: -1
+            val dateIdx = cursor?.getColumnIndex(Telephony.Sms.DATE) ?: -1
+            val typeIdx = cursor?.getColumnIndex(Telephony.Sms.TYPE) ?: -1
+            val readIdx = cursor?.getColumnIndex(Telephony.Sms.READ) ?: -1
 
+            val messagesToInsert = ArrayList<MessageEntity>()
+            
+            // To group by conversations and determine the latest message for each
+            val conversationLatestMap = HashMap<String, Pair<String, Long>>() // address -> Pair(body, date)
+            val conversationUnreadMap = HashMap<String, Int>() // address -> unreadCount
+            val contactNameMap = HashMap<String, String?>()
+
+            // Pre-load all existing conversations to avoid overwriting properties like isPinned/isBlocked or custom color
+            val existingConversations = conversationDao.getAllConversationsDirect().associateBy { it.conversationId }
+
+            cursor?.use { c ->
                 while (c.moveToNext()) {
+                    val smsId = if (idIdx >= 0) c.getLong(idIdx) else continue
                     val address = if (addressIdx >= 0) c.getString(addressIdx) else null
                     val body = if (bodyIdx >= 0) c.getString(bodyIdx) else ""
                     val date = if (dateIdx >= 0) c.getLong(dateIdx) else System.currentTimeMillis()
                     val type = if (typeIdx >= 0) c.getInt(typeIdx) else Telephony.Sms.MESSAGE_TYPE_INBOX
+                    val read = if (readIdx >= 0) c.getInt(readIdx) else 1
 
-                    if (!address.isNullOrBlank() && body.isNotBlank()) {
+                    if (!address.isNullOrBlank()) {
                         val conversationId = address
                         val isFromMe = type == Telephony.Sms.MESSAGE_TYPE_SENT || type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
                         val sender = if (isFromMe) "ME" else address
                         val recipient = if (isFromMe) address else "ME"
 
-                        // Ensure conversation exists
-                        val existingConv = conversationDao.getConversationByIdDirect(conversationId)
-                        val contact = contactRepository.getContactByPhoneNumber(address)
-                        val contactName = existingConv?.contactName ?: contact?.name
+                        // Track latest message for the conversation
+                        val currentLatest = conversationLatestMap[address]
+                        if (currentLatest == null || date > currentLatest.second) {
+                            conversationLatestMap[address] = Pair(body, date)
+                        }
 
-                        val conv = ConversationEntity(
-                            conversationId = conversationId,
-                            phoneNumber = address,
-                            contactName = contactName,
-                            lastMessage = body,
-                            lastMessageTimestamp = date,
-                            unreadCount = 0,
-                            isInternetUser = false
-                        )
-                        conversationDao.insertConversation(conv)
+                        // Track unread count (if incoming and read == 0)
+                        if (!isFromMe && read == 0) {
+                            conversationUnreadMap[address] = (conversationUnreadMap[address] ?: 0) + 1
+                        }
 
-                        // Insert message
+                        // Add message entity
                         val msg = MessageEntity(
-                            messageId = "sms_sys_${UUID.randomUUID()}",
+                            messageId = "sms_${smsId}",
                             conversationId = conversationId,
                             senderPhoneNumber = sender,
                             recipientPhoneNumber = recipient,
@@ -91,13 +100,54 @@ class SmsSyncHelper(
                             messageType = MessageType.SMS,
                             status = if (isFromMe) MessageStatus.SENT else MessageStatus.READ
                         )
-                        messageDao.insertMessage(msg)
-                        importedCount++
+                        messagesToInsert.add(msg)
                     }
                 }
             }
-        } catch (_: Exception) {
-            // Handled safely
+
+            // Build Conversation entities
+            val conversationsToInsert = ArrayList<ConversationEntity>()
+            for ((address, latestInfo) in conversationLatestMap) {
+                val existingConv = existingConversations[address]
+                
+                // Get contact name (cache name per address)
+                val contactName = existingConv?.contactName ?: contactNameMap.getOrPut(address) {
+                    contactRepository.getContactByPhoneNumber(address)?.name
+                }
+
+                val unreadCount = conversationUnreadMap[address] ?: 0
+
+                val conv = ConversationEntity(
+                    conversationId = address,
+                    phoneNumber = address,
+                    contactName = contactName,
+                    lastMessage = latestInfo.first,
+                    lastMessageTimestamp = latestInfo.second,
+                    unreadCount = if (existingConv != null) existingConv.unreadCount + unreadCount else unreadCount,
+                    isInternetUser = existingConv?.isInternetUser ?: false,
+                    isPinned = existingConv?.isPinned ?: false,
+                    isBlocked = existingConv?.isBlocked ?: false,
+                    customColorHex = existingConv?.customColorHex
+                )
+                conversationsToInsert.add(conv)
+            }
+
+            // Perform batch inserts
+            if (conversationsToInsert.isNotEmpty()) {
+                conversationDao.insertConversations(conversationsToInsert)
+            }
+
+            // Insert messages in chunks of 500 to avoid Room/SQLite binder limits and keep memory usage bounded
+            val chunkSize = 500
+            for (i in messagesToInsert.indices step chunkSize) {
+                val end = minOf(i + chunkSize, messagesToInsert.size)
+                val chunk = messagesToInsert.subList(i, end)
+                messageDao.insertMessagesIgnore(chunk)
+                importedCount += chunk.size
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         importedCount
     }

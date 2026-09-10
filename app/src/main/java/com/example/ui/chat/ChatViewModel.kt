@@ -17,6 +17,7 @@ import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
 import com.example.ui.util.SimManagerHelper
+import com.example.ui.util.VoiceNoteHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,6 +75,14 @@ class ChatViewModel(
     val delayedSendState: StateFlow<DelayedSendState?> = _delayedSendState.asStateFlow()
 
     private var delayedSendJob: Job? = null
+
+    private val _isRecordingVoice = MutableStateFlow(false)
+    val isRecordingVoice: StateFlow<Boolean> = _isRecordingVoice.asStateFlow()
+
+    private val _recordingDurationSec = MutableStateFlow(0)
+    val recordingDurationSec: StateFlow<Int> = _recordingDurationSec.asStateFlow()
+
+    private var recordingTimerJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -312,5 +321,44 @@ class ChatViewModel(
         viewModelScope.launch {
             messageRepository.deleteMessage(messageId)
         }
+    }
+
+    fun startVoiceRecording(context: Context) {
+        val file = VoiceNoteHelper.startRecording(context)
+        if (file != null) {
+            _isRecordingVoice.value = true
+            _recordingDurationSec.value = 0
+            recordingTimerJob?.cancel()
+            recordingTimerJob = viewModelScope.launch {
+                while (_isRecordingVoice.value) {
+                    delay(1000)
+                    _recordingDurationSec.value += 1
+                }
+            }
+        }
+    }
+
+    fun stopAndSendVoiceRecording(context: Context) {
+        recordingTimerJob?.cancel()
+        _isRecordingVoice.value = false
+        _recordingDurationSec.value = 0
+        val file = VoiceNoteHelper.stopRecording()
+        if (file != null && file.exists()) {
+            actuallyDispatchMessage(context, "Voice message", file.absolutePath)
+        }
+    }
+
+    fun cancelVoiceRecording() {
+        recordingTimerJob?.cancel()
+        _isRecordingVoice.value = false
+        _recordingDurationSec.value = 0
+        VoiceNoteHelper.stopRecording()?.delete()
+    }
+
+    fun sendMediaAttachment(context: Context, uriString: String, caption: String? = null) {
+        val text = caption?.trim() ?: _inputText.value.trim()
+        val contentToSend = if (text.isNotBlank()) text else "Photo attachment"
+        _inputText.value = ""
+        actuallyDispatchMessage(context, contentToSend, uriString)
     }
 }

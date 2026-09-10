@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,8 +35,11 @@ import androidx.compose.material.icons.filled.FontDownload
 import androidx.compose.material.icons.filled.FormatShapes
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Mms
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SimCard
@@ -93,6 +97,7 @@ fun ProfileScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val appSettings by viewModel.appSettings.collectAsState()
     val isDefaultSmsApp by viewModel.isDefaultSmsApp.collectAsState()
+    val isBatteryOptimized by viewModel.isBatteryOptimized.collectAsState()
     val hasSmsPermission by viewModel.hasSmsPermission.collectAsState()
     val syncMessage by viewModel.syncMessage.collectAsState()
     val blockedContacts by viewModel.blockedContacts.collectAsState()
@@ -102,6 +107,12 @@ fun ProfileScreen(
     var signatureInput by remember { mutableStateOf(appSettings.signatureText) }
 
     val smsRoleLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.checkStatus(context)
+    }
+
+    val batteryOptLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
         viewModel.checkStatus(context)
@@ -133,6 +144,7 @@ fun ProfileScreen(
             .background(backgroundGradient)
     ) {
         Scaffold(
+            modifier = Modifier.imePadding(),
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
@@ -276,6 +288,201 @@ fun ProfileScreen(
                                 showSignatureDialog = true
                             }) {
                                 Text("Edit")
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Section: MMS & Media Messaging
+                Text(
+                    text = "MMS & Media Messaging",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Mms, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("MMS Size Limit", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                        Text(
+                            "Maximum size for outgoing MMS photos and media",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("300KB" to "300 KB", "600KB" to "600 KB", "1MB" to "1 MB", "2MB" to "2 MB").forEach { (limit, label) ->
+                                FilterChip(
+                                    selected = appSettings.mmsSizeLimit == limit,
+                                    onClick = { viewModel.setMmsSizeLimit(limit) },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text("Auto-Download MMS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Automatically retrieve incoming multimedia messages",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("ALWAYS" to "Always", "WIFI_ONLY" to "Wi-Fi Only", "NEVER" to "Manual").forEach { (mode, label) ->
+                                FilterChip(
+                                    selected = appSettings.autoDownloadMms == mode,
+                                    onClick = { viewModel.setAutoDownloadMms(mode) },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Auto-Save Photos to Gallery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Save received MMS photos to Pictures/PulseChat automatically", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = appSettings.autoSavePhotos,
+                                onCheckedChange = { viewModel.setAutoSavePhotos(it) }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Section: Notifications & Alerts
+                Text(
+                    text = "Notifications & Alerts",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Notification Sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Play sound on incoming SMS/MMS messages", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = appSettings.notificationSound,
+                                onCheckedChange = { viewModel.setNotificationSound(it) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text("Vibration Pattern", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Vibrate pattern for incoming text notifications",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("DEFAULT" to "Default", "SHORT" to "Short", "LONG" to "Long", "DOUBLE" to "Double").forEach { (pattern, label) ->
+                                FilterChip(
+                                    selected = appSettings.notificationVibratePattern == pattern,
+                                    onClick = { viewModel.setNotificationVibratePattern(pattern) },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Quick Reply Heads-Up", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Show interactive reply action directly on incoming notifications", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = appSettings.quickReplyPopup,
+                                onCheckedChange = { viewModel.setQuickReplyPopup(it) }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text("Repeat Notification Reminder", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Re-alert if unread messages are not opened",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf(0 to "Off", 1 to "1x", 2 to "2x", 3 to "3x").forEach { (count, label) ->
+                                FilterChip(
+                                    selected = appSettings.repeatNotificationCount == count,
+                                    onClick = { viewModel.setRepeatNotificationCount(count) },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
                             }
                         }
                     }
@@ -662,6 +869,67 @@ fun ProfileScreen(
                                     modifier = Modifier.testTag("grant_permissions_settings_btn")
                                 ) {
                                     Text("Grant", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Background Execution & Battery Optimization Status
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (!isBatteryOptimized) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else MaterialTheme.colorScheme.secondaryContainer
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (!isBatteryOptimized) Icons.Default.CheckCircle else Icons.Default.Power,
+                                    contentDescription = null,
+                                    tint = if (!isBatteryOptimized) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Background Reliability",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = if (!isBatteryOptimized) "Unrestricted background execution enabled" else "Restricted by OS battery saver / Doze",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (isBatteryOptimized) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val intent = viewModel.createRequestBatteryOptimizationIntent(context)
+                                        if (intent != null) {
+                                            try {
+                                                batteryOptLauncher.launch(intent)
+                                            } catch (_: Exception) {
+                                                context.startActivity(viewModel.createAppSettingsIntent(context))
+                                            }
+                                        } else {
+                                            context.startActivity(viewModel.createAppSettingsIntent(context))
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.testTag("request_battery_optimization_btn")
+                                ) {
+                                    Text("Allow", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }

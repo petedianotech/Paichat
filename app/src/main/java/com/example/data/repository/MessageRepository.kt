@@ -187,7 +187,12 @@ class MessageRepository(
         subscriptionId: Int? = null
     ): MessageEntity {
         val conversationId = recipientPhone
-        val messageType = MessageType.SMS
+        val messageType = if (mediaUrl != null) MessageType.MMS else MessageType.SMS
+        val messageSummary = when {
+            mediaUrl != null && (mediaUrl.endsWith(".m4a") || mediaUrl.contains("voice_")) -> "🎵 Voice message"
+            mediaUrl != null -> "📷 Photo attachment"
+            else -> content
+        }
 
         // 1. Ensure conversation exists
         val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
@@ -197,7 +202,7 @@ class MessageRepository(
             conversationId = conversationId,
             phoneNumber = recipientPhone,
             contactName = recipientName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(recipientPhone)?.name,
-            lastMessage = if (mediaUrl != null) "Photo" else content,
+            lastMessage = messageSummary,
             lastMessageTimestamp = timestamp,
             unreadCount = 0,
             isInternetUser = false,
@@ -374,11 +379,18 @@ class MessageRepository(
         val unread = (existingConversation?.unreadCount ?: 0) + 1
         val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
 
+        val messageSummary = when {
+            mediaUrl != null && (mediaUrl.endsWith(".m4a") || mediaUrl.contains("voice_")) -> "🎵 Voice message"
+            mediaUrl != null -> "📷 Photo attachment"
+            messageType == MessageType.MMS -> "📎 MMS message"
+            else -> content
+        }
+
         val conversation = ConversationEntity(
             conversationId = conversationId,
             phoneNumber = senderPhone,
             contactName = resolvedName,
-            lastMessage = if (mediaUrl != null) "Photo" else content,
+            lastMessage = messageSummary,
             lastMessageTimestamp = timestamp,
             unreadCount = unread,
             isInternetUser = false,
@@ -396,7 +408,7 @@ class MessageRepository(
             content = content,
             timestamp = timestamp,
             messageType = messageType,
-            status = MessageStatus.READ,
+            status = MessageStatus.DELIVERED,
             mediaUrl = mediaUrl
         )
         messageDao.insertMessage(message)

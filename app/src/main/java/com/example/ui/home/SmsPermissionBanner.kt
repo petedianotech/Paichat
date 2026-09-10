@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.example.ui.util.DefaultSmsHelper
 
 @Composable
 fun SmsPermissionBanner(
@@ -47,12 +48,24 @@ fun SmsPermissionBanner(
     val context = LocalContext.current
     var isDismissed by remember { mutableStateOf(false) }
     var hasSmsPermissions by remember { mutableStateOf(checkAllSmsPermissions(context)) }
+    var isDefaultSms by remember { mutableStateOf(DefaultSmsHelper.isDefaultSmsApp(context)) }
+
+    val defaultSmsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        isDefaultSms = DefaultSmsHelper.isDefaultSmsApp(context)
+        hasSmsPermissions = checkAllSmsPermissions(context)
+        if (isDefaultSms || hasSmsPermissions) {
+            onPermissionsGranted()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         val allGranted = results.values.all { it }
         hasSmsPermissions = checkAllSmsPermissions(context)
+        isDefaultSms = DefaultSmsHelper.isDefaultSmsApp(context)
         if (allGranted || hasSmsPermissions) {
             onPermissionsGranted()
         }
@@ -60,10 +73,14 @@ fun SmsPermissionBanner(
 
     LaunchedEffect(Unit) {
         hasSmsPermissions = checkAllSmsPermissions(context)
+        isDefaultSms = DefaultSmsHelper.isDefaultSmsApp(context)
     }
 
+    // Show banner if not default SMS app OR missing SMS permissions
+    val shouldShow = (!hasSmsPermissions || !isDefaultSms) && !isDismissed
+
     AnimatedVisibility(
-        visible = !hasSmsPermissions && !isDismissed,
+        visible = shouldShow,
         modifier = modifier
     ) {
         Card(
@@ -93,13 +110,16 @@ fun SmsPermissionBanner(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Allow Text Messages",
+                        text = if (!isDefaultSms) "Set as Default SMS App" else "Allow Text Messages",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Text(
-                        text = "Allow PaiChat to read and send regular text messages on your phone.",
+                        text = if (!isDefaultSms)
+                            "Make PulseChat your default SMS app for instant background notifications and seamless messaging."
+                        else
+                            "Allow PulseChat to read and send regular text messages on your phone.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                     )
@@ -109,14 +129,30 @@ fun SmsPermissionBanner(
 
                 Button(
                     onClick = {
-                        permissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.SEND_SMS,
-                                Manifest.permission.RECEIVE_SMS,
-                                Manifest.permission.READ_SMS,
-                                Manifest.permission.READ_CONTACTS
+                        if (!isDefaultSms) {
+                            val defaultIntent = DefaultSmsHelper.createDefaultSmsIntent(context)
+                            if (defaultIntent != null) {
+                                defaultSmsLauncher.launch(defaultIntent)
+                            } else {
+                                permissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.SEND_SMS,
+                                        Manifest.permission.RECEIVE_SMS,
+                                        Manifest.permission.READ_SMS,
+                                        Manifest.permission.READ_CONTACTS
+                                    )
+                                )
+                            }
+                        } else {
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.SEND_SMS,
+                                    Manifest.permission.RECEIVE_SMS,
+                                    Manifest.permission.READ_SMS,
+                                    Manifest.permission.READ_CONTACTS
+                                )
                             )
-                        )
+                        }
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -125,7 +161,7 @@ fun SmsPermissionBanner(
                     ),
                     modifier = Modifier.testTag("allow_sms_permission_button")
                 ) {
-                    Text("Allow")
+                    Text(if (!isDefaultSms) "Set Default" else "Allow")
                 }
 
                 IconButton(

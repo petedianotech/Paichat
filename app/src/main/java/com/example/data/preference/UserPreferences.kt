@@ -17,7 +17,16 @@ data class AppSettings(
     val fontSize: String = "NORMAL", // SMALL, NORMAL, LARGE, EXTRA_LARGE
     val vibrateOnSend: Boolean = true,
     val showCharacterCounter: Boolean = true,
-    val selectedSimSlot: Int = 0 // 0 = SIM 1, 1 = SIM 2
+    val selectedSimSlot: Int = 0, // 0 = SIM 1, 1 = SIM 2
+    // Textra-grade MMS & Media settings
+    val mmsSizeLimit: String = "1MB", // 300KB, 600KB, 1MB, 2MB
+    val autoDownloadMms: String = "ALWAYS", // ALWAYS, WIFI_ONLY, NEVER
+    val autoSavePhotos: Boolean = false,
+    // Notification & Quick Reply settings
+    val notificationSound: Boolean = true,
+    val notificationVibratePattern: String = "NORMAL", // NORMAL, SHORT, LONG, OFF
+    val quickReplyPopup: Boolean = true,
+    val repeatNotificationCount: Int = 0 // 0 = Never, 1, 2, 5
 )
 
 class UserPreferences(context: Context) {
@@ -39,6 +48,14 @@ class UserPreferences(context: Context) {
         val charCounter = prefs.getBoolean("show_char_counter", true)
         val simSlot = prefs.getInt("selected_sim_slot", 0)
 
+        val mmsSize = prefs.getString("mms_size_limit", "1MB") ?: "1MB"
+        val autoMms = prefs.getString("auto_download_mms", "ALWAYS") ?: "ALWAYS"
+        val autoSave = prefs.getBoolean("auto_save_photos", false)
+        val notifSound = prefs.getBoolean("notification_sound", true)
+        val notifVib = prefs.getString("notification_vibrate_pattern", "NORMAL") ?: "NORMAL"
+        val quickReply = prefs.getBoolean("quick_reply_popup", true)
+        val repeatNotif = prefs.getInt("repeat_notification_count", 0)
+
         return AppSettings(
             isOnboarded = onboarded,
             themeMode = theme,
@@ -50,7 +67,14 @@ class UserPreferences(context: Context) {
             fontSize = font,
             vibrateOnSend = vibrate,
             showCharacterCounter = charCounter,
-            selectedSimSlot = simSlot
+            selectedSimSlot = simSlot,
+            mmsSizeLimit = mmsSize,
+            autoDownloadMms = autoMms,
+            autoSavePhotos = autoSave,
+            notificationSound = notifSound,
+            notificationVibratePattern = notifVib,
+            quickReplyPopup = quickReply,
+            repeatNotificationCount = repeatNotif
         )
     }
 
@@ -107,5 +131,40 @@ class UserPreferences(context: Context) {
     fun setSelectedSimSlot(slot: Int) {
         prefs.edit().putInt("selected_sim_slot", slot).apply()
         _appSettings.value = _appSettings.value.copy(selectedSimSlot = slot)
+    }
+
+    fun setMmsSizeLimit(limit: String) {
+        prefs.edit().putString("mms_size_limit", limit).apply()
+        _appSettings.value = _appSettings.value.copy(mmsSizeLimit = limit)
+    }
+
+    fun setAutoDownloadMms(mode: String) {
+        prefs.edit().putString("auto_download_mms", mode).apply()
+        _appSettings.value = _appSettings.value.copy(autoDownloadMms = mode)
+    }
+
+    fun setAutoSavePhotos(enabled: Boolean) {
+        prefs.edit().putBoolean("auto_save_photos", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(autoSavePhotos = enabled)
+    }
+
+    fun setNotificationSound(enabled: Boolean) {
+        prefs.edit().putBoolean("notification_sound", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(notificationSound = enabled)
+    }
+
+    fun setNotificationVibratePattern(pattern: String) {
+        prefs.edit().putString("notification_vibrate_pattern", pattern).apply()
+        _appSettings.value = _appSettings.value.copy(notificationVibratePattern = pattern)
+    }
+
+    fun setQuickReplyPopup(enabled: Boolean) {
+        prefs.edit().putBoolean("quick_reply_popup", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(quickReplyPopup = enabled)
+    }
+
+    fun setRepeatNotificationCount(count: Int) {
+        prefs.edit().putInt("repeat_notification_count", count).apply()
+        _appSettings.value = _appSettings.value.copy(repeatNotificationCount = count)
     }
 }

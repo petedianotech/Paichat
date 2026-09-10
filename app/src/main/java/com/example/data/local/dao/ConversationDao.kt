@@ -22,11 +22,17 @@ interface ConversationDao {
     @Query("SELECT * FROM conversations WHERE conversationId = :id")
     suspend fun getConversationByIdDirect(id: String): ConversationEntity?
 
+    @Query("SELECT * FROM conversations")
+    suspend fun getAllConversationsDirect(): List<ConversationEntity>
+
     @Query("SELECT * FROM conversations WHERE phoneNumber = :phoneNumber LIMIT 1")
     suspend fun getConversationByPhoneNumber(phoneNumber: String): ConversationEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConversation(conversation: ConversationEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertConversations(conversations: List<ConversationEntity>)
 
     @Update
     suspend fun updateConversation(conversation: ConversationEntity)

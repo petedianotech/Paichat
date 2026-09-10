@@ -14,6 +14,7 @@ import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
 import com.example.ui.home.checkAllSmsPermissions
+import com.example.ui.util.DefaultSmsHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,9 @@ class ProfileViewModel(
     private val _isDefaultSmsApp = MutableStateFlow(false)
     val isDefaultSmsApp: StateFlow<Boolean> = _isDefaultSmsApp.asStateFlow()
 
+    private val _isBatteryOptimized = MutableStateFlow(false)
+    val isBatteryOptimized: StateFlow<Boolean> = _isBatteryOptimized.asStateFlow()
+
     private val _hasSmsPermission = MutableStateFlow(false)
     val hasSmsPermission: StateFlow<Boolean> = _hasSmsPermission.asStateFlow()
 
@@ -47,30 +51,21 @@ class ProfileViewModel(
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
 
     fun checkStatus(context: Context) {
-        checkDefaultSmsStatus(context)
+        _isDefaultSmsApp.value = DefaultSmsHelper.isDefaultSmsApp(context)
+        _isBatteryOptimized.value = !DefaultSmsHelper.isIgnoringBatteryOptimizations(context)
         _hasSmsPermission.value = checkAllSmsPermissions(context)
     }
 
-    private fun checkDefaultSmsStatus(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = context.getSystemService(RoleManager::class.java)
-            _isDefaultSmsApp.value = roleManager?.isRoleHeld(RoleManager.ROLE_SMS) == true
-        } else {
-            val defaultSmsPackage = Telephony.Sms.getDefaultSmsPackage(context)
-            _isDefaultSmsApp.value = defaultSmsPackage == context.packageName
-        }
+    fun createDefaultSmsIntent(context: Context): Intent? {
+        return DefaultSmsHelper.createDefaultSmsIntent(context)
     }
 
-    fun createDefaultSmsIntent(context: Context): Intent? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = context.getSystemService(RoleManager::class.java)
-            roleManager?.createRequestRoleIntent(RoleManager.ROLE_SMS)
-        } else {
-            @Suppress("DEPRECATION")
-            Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
-                putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, context.packageName)
-            }
-        }
+    fun createRequestBatteryOptimizationIntent(context: Context): Intent? {
+        return DefaultSmsHelper.createRequestBatteryOptimizationIntent(context)
+    }
+
+    fun createAppSettingsIntent(context: Context): Intent {
+        return DefaultSmsHelper.createAppSettingsIntent(context)
     }
 
     fun syncDeviceData(context: Context) {
@@ -119,6 +114,34 @@ class ProfileViewModel(
 
     fun setShowCharacterCounter(enabled: Boolean) {
         userPreferences.setShowCharacterCounter(enabled)
+    }
+
+    fun setMmsSizeLimit(limit: String) {
+        userPreferences.setMmsSizeLimit(limit)
+    }
+
+    fun setAutoDownloadMms(mode: String) {
+        userPreferences.setAutoDownloadMms(mode)
+    }
+
+    fun setAutoSavePhotos(enabled: Boolean) {
+        userPreferences.setAutoSavePhotos(enabled)
+    }
+
+    fun setNotificationSound(enabled: Boolean) {
+        userPreferences.setNotificationSound(enabled)
+    }
+
+    fun setNotificationVibratePattern(pattern: String) {
+        userPreferences.setNotificationVibratePattern(pattern)
+    }
+
+    fun setQuickReplyPopup(enabled: Boolean) {
+        userPreferences.setQuickReplyPopup(enabled)
+    }
+
+    fun setRepeatNotificationCount(count: Int) {
+        userPreferences.setRepeatNotificationCount(count)
     }
 
     fun unblockContact(phoneNumber: String) {
