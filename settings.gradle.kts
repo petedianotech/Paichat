@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "PaiChat"
+rootProject.name = "Messages"
 
 include(":app")

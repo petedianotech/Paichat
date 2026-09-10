@@ -6,67 +6,106 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-data class UserProfile(
-    val phoneNumber: String = "",
-    val displayName: String = "",
-    val avatarId: String = "avatar_1",
+data class AppSettings(
     val isOnboarded: Boolean = false,
-    val themeMode: String = "SYSTEM", // SYSTEM, LIGHT, DARK
-    val colorTheme: String = "BLUE", // BLUE, TEAL, PURPLE, EMERALD
-    val chatWallpaper: String = "NONE" // NONE, SUBTLE, DOODLE, NATURE
+    val themeMode: String = "SYSTEM", // SYSTEM, LIGHT, DARK, AMOLED
+    val colorTheme: String = "BLUE", // BLUE, INDIGO, PURPLE, ROSE, TEAL, AMBER
+    val sendDelaySeconds: Int = 3, // 0 (off), 1, 2, 3, 5, 10
+    val deliveryReports: Boolean = true,
+    val signatureText: String = "",
+    val bubbleShape: String = "ROUNDED", // ROUNDED, PILL, SQUARE
+    val fontSize: String = "NORMAL", // SMALL, NORMAL, LARGE, EXTRA_LARGE
+    val vibrateOnSend: Boolean = true,
+    val showCharacterCounter: Boolean = true,
+    val selectedSimSlot: Int = 0 // 0 = SIM 1, 1 = SIM 2
 )
 
 class UserPreferences(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("paichat_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.getSharedPreferences("sms_app_prefs", Context.MODE_PRIVATE)
 
-    private val _userProfile = MutableStateFlow(loadProfile())
-    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+    private val _appSettings = MutableStateFlow(loadSettings())
+    val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
 
-    private fun loadProfile(): UserProfile {
-        val phone = prefs.getString("phone_number", "") ?: ""
-        val name = prefs.getString("display_name", "") ?: ""
-        val avatar = prefs.getString("avatar_id", "avatar_1") ?: "avatar_1"
+    private fun loadSettings(): AppSettings {
         val onboarded = prefs.getBoolean("is_onboarded", false)
         val theme = prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
         val color = prefs.getString("color_theme", "BLUE") ?: "BLUE"
-        val wallpaper = prefs.getString("chat_wallpaper", "NONE") ?: "NONE"
-        return UserProfile(phone, name, avatar, onboarded, theme, color, wallpaper)
+        val delay = prefs.getInt("send_delay_seconds", 3)
+        val delivery = prefs.getBoolean("delivery_reports", true)
+        val sig = prefs.getString("signature_text", "") ?: ""
+        val shape = prefs.getString("bubble_shape", "ROUNDED") ?: "ROUNDED"
+        val font = prefs.getString("font_size", "NORMAL") ?: "NORMAL"
+        val vibrate = prefs.getBoolean("vibrate_on_send", true)
+        val charCounter = prefs.getBoolean("show_char_counter", true)
+        val simSlot = prefs.getInt("selected_sim_slot", 0)
+
+        return AppSettings(
+            isOnboarded = onboarded,
+            themeMode = theme,
+            colorTheme = color,
+            sendDelaySeconds = delay,
+            deliveryReports = delivery,
+            signatureText = sig,
+            bubbleShape = shape,
+            fontSize = font,
+            vibrateOnSend = vibrate,
+            showCharacterCounter = charCounter,
+            selectedSimSlot = simSlot
+        )
     }
 
-    fun saveProfile(phoneNumber: String, displayName: String, avatarId: String) {
-        val current = _userProfile.value
-        prefs.edit()
-            .putString("phone_number", phoneNumber)
-            .putString("display_name", displayName)
-            .putString("avatar_id", avatarId)
-            .putBoolean("is_onboarded", true)
-            .apply()
-        _userProfile.value = current.copy(
-            phoneNumber = phoneNumber,
-            displayName = displayName,
-            avatarId = avatarId,
-            isOnboarded = true
-        )
+    fun setOnboarded(onboarded: Boolean = true) {
+        prefs.edit().putBoolean("is_onboarded", onboarded).apply()
+        _appSettings.value = _appSettings.value.copy(isOnboarded = onboarded)
     }
 
     fun setThemeMode(mode: String) {
         prefs.edit().putString("theme_mode", mode).apply()
-        _userProfile.value = _userProfile.value.copy(themeMode = mode)
+        _appSettings.value = _appSettings.value.copy(themeMode = mode)
     }
 
     fun setColorTheme(color: String) {
         prefs.edit().putString("color_theme", color).apply()
-        _userProfile.value = _userProfile.value.copy(colorTheme = color)
+        _appSettings.value = _appSettings.value.copy(colorTheme = color)
     }
 
-    fun setChatWallpaper(wallpaper: String) {
-        prefs.edit().putString("chat_wallpaper", wallpaper).apply()
-        _userProfile.value = _userProfile.value.copy(chatWallpaper = wallpaper)
+    fun setSendDelaySeconds(seconds: Int) {
+        prefs.edit().putInt("send_delay_seconds", seconds).apply()
+        _appSettings.value = _appSettings.value.copy(sendDelaySeconds = seconds)
     }
 
-    fun clearProfile() {
-        prefs.edit().clear().apply()
-        _userProfile.value = UserProfile()
+    fun setDeliveryReports(enabled: Boolean) {
+        prefs.edit().putBoolean("delivery_reports", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(deliveryReports = enabled)
+    }
+
+    fun setSignatureText(sig: String) {
+        prefs.edit().putString("signature_text", sig).apply()
+        _appSettings.value = _appSettings.value.copy(signatureText = sig)
+    }
+
+    fun setBubbleShape(shape: String) {
+        prefs.edit().putString("bubble_shape", shape).apply()
+        _appSettings.value = _appSettings.value.copy(bubbleShape = shape)
+    }
+
+    fun setFontSize(size: String) {
+        prefs.edit().putString("font_size", size).apply()
+        _appSettings.value = _appSettings.value.copy(fontSize = size)
+    }
+
+    fun setVibrateOnSend(enabled: Boolean) {
+        prefs.edit().putBoolean("vibrate_on_send", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(vibrateOnSend = enabled)
+    }
+
+    fun setShowCharacterCounter(enabled: Boolean) {
+        prefs.edit().putBoolean("show_char_counter", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(showCharacterCounter = enabled)
+    }
+
+    fun setSelectedSimSlot(slot: Int) {
+        prefs.edit().putInt("selected_sim_slot", slot).apply()
+        _appSettings.value = _appSettings.value.copy(selectedSimSlot = slot)
     }
 }
-

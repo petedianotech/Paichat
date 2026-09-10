@@ -1,7 +1,8 @@
 package com.example.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,7 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,13 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.example.data.local.entity.ConversationEntity
-import com.example.ui.theme.SmsBadgeBgLight
-import com.example.ui.theme.SmsBadgeTextLight
 import com.example.ui.util.AvatarUtil
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import com.example.ui.util.TimeFormatter
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -49,13 +45,16 @@ fun ConversationItem(
     onLongClick: () -> Unit
 ) {
     val contactName = conversation.contactName ?: conversation.phoneNumber
-    val avatarColor = AvatarUtil.getAvatarColor(conversation.phoneNumber)
+    val customColor = conversation.customColorHex?.let {
+        try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
+    }
+    val avatarColor = customColor ?: AvatarUtil.getAvatarColor(conversation.phoneNumber)
     val initials = AvatarUtil.getInitials(contactName)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 3.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -63,7 +62,11 @@ fun ConversationItem(
             .testTag("conversation_item_${conversation.conversationId}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+            containerColor = if (conversation.isPinned) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            } else {
+                MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+            }
         )
     ) {
         Row(
@@ -72,34 +75,23 @@ fun ConversationItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
+            // Contact Initials Avatar
             Box(
                 modifier = Modifier
-                    .size(52.dp)
+                    .size(50.dp)
                     .clip(CircleShape)
                     .background(avatarColor),
                 contentAlignment = Alignment.Center
             ) {
-                val avatarUrl = AvatarUtil.avatarPresets.find { it.first == conversation.conversationId }?.second
-                if (avatarUrl != null) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = contactName,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(CircleShape)
-                    )
-                } else {
-                    Text(
-                        text = initials,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                Text(
+                    text = initials,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             // Main Details
             Column(modifier = Modifier.weight(1f)) {
@@ -115,6 +107,16 @@ fun ConversationItem(
                         modifier = Modifier.weight(1f)
                     )
 
+                    if (conversation.isPinned) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = "Pinned",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
@@ -129,7 +131,6 @@ fun ConversationItem(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Minimalist SMS Badge
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),

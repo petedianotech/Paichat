@@ -22,7 +22,7 @@ class SmsSyncHelper(
     private val messageDao: MessageDao,
     private val contactRepository: ContactRepository
 ) {
-    suspend fun syncDeviceSms(userPhoneNumber: String): Int = withContext(Dispatchers.IO) {
+    suspend fun syncDeviceSms(): Int = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             return@withContext 0
         }
@@ -43,7 +43,7 @@ class SmsSyncHelper(
                 projection,
                 null,
                 null,
-                "${Telephony.Sms.DATE} DESC LIMIT 100"
+                "${Telephony.Sms.DATE} DESC LIMIT 500"
             )
 
             cursor?.use { c ->
@@ -61,8 +61,8 @@ class SmsSyncHelper(
                     if (!address.isNullOrBlank() && body.isNotBlank()) {
                         val conversationId = address
                         val isFromMe = type == Telephony.Sms.MESSAGE_TYPE_SENT || type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
-                        val sender = if (isFromMe) userPhoneNumber else address
-                        val recipient = if (isFromMe) address else userPhoneNumber
+                        val sender = if (isFromMe) "ME" else address
+                        val recipient = if (isFromMe) address else "ME"
 
                         // Ensure conversation exists
                         val existingConv = conversationDao.getConversationByIdDirect(conversationId)
@@ -76,7 +76,7 @@ class SmsSyncHelper(
                             lastMessage = body,
                             lastMessageTimestamp = date,
                             unreadCount = 0,
-                            isInternetUser = contact?.isInternetUser ?: false
+                            isInternetUser = false
                         )
                         conversationDao.insertConversation(conv)
 

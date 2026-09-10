@@ -45,4 +45,10 @@ object TimeFormatter {
         val timeFormat = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
         return timeFormat.format(Date(timestamp))
     }
+
+    fun formatFullDateTime(timestamp: Long): String {
+        if (timestamp <= 0) return ""
+        val timeFormat = SimpleDateFormat("EEE, MMM d, yyyy h:mm:ss a", Locale.getDefault())
+        return timeFormat.format(Date(timestamp))
+    }
 }

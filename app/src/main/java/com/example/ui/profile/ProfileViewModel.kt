@@ -7,13 +7,18 @@ import android.os.Build
 import android.provider.Telephony
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.entity.BlockedContactEntity
+import com.example.data.local.entity.ScheduledMessageEntity
+import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
 import com.example.ui.home.checkAllSmsPermissions
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ProfileViewModel(
@@ -22,7 +27,15 @@ class ProfileViewModel(
     private val contactRepository: ContactRepository
 ) : ViewModel() {
 
-    val userProfile = userPreferences.userProfile
+    val appSettings: StateFlow<AppSettings> = userPreferences.appSettings
+
+    val blockedContacts: StateFlow<List<BlockedContactEntity>> =
+        messageRepository.getAllBlockedContacts()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allScheduledMessages: StateFlow<List<ScheduledMessageEntity>> =
+        messageRepository.getAllScheduledMessages()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isDefaultSmsApp = MutableStateFlow(false)
     val isDefaultSmsApp: StateFlow<Boolean> = _isDefaultSmsApp.asStateFlow()
@@ -53,6 +66,7 @@ class ProfileViewModel(
             val roleManager = context.getSystemService(RoleManager::class.java)
             roleManager?.createRequestRoleIntent(RoleManager.ROLE_SMS)
         } else {
+            @Suppress("DEPRECATION")
             Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).apply {
                 putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, context.packageName)
             }
@@ -61,9 +75,9 @@ class ProfileViewModel(
 
     fun syncDeviceData(context: Context) {
         viewModelScope.launch {
-            val contactsCount = contactRepository.syncDeviceContacts(context)
-            val smsCount = messageRepository.syncDeviceSms(userProfile.value.phoneNumber)
-            _syncMessage.value = "Synced $contactsCount contacts and $smsCount text messages."
+            contactRepository.syncDeviceContacts(context)
+            val smsCount = messageRepository.syncDeviceSms()
+            _syncMessage.value = "Synced SIM messages and contacts ($smsCount messages imported)."
         }
     }
 
@@ -79,11 +93,54 @@ class ProfileViewModel(
         userPreferences.setColorTheme(color)
     }
 
-    fun setChatWallpaper(wallpaper: String) {
-        userPreferences.setChatWallpaper(wallpaper)
+    fun setSendDelaySeconds(seconds: Int) {
+        userPreferences.setSendDelaySeconds(seconds)
     }
 
-    fun updateProfile(name: String, phone: String, avatar: String) {
-        userPreferences.saveProfile(phone, name, avatar)
+    fun setDeliveryReports(enabled: Boolean) {
+        userPreferences.setDeliveryReports(enabled)
+    }
+
+    fun setSignatureText(sig: String) {
+        userPreferences.setSignatureText(sig)
+    }
+
+    fun setBubbleShape(shape: String) {
+        userPreferences.setBubbleShape(shape)
+    }
+
+    fun setFontSize(size: String) {
+        userPreferences.setFontSize(size)
+    }
+
+    fun setVibrateOnSend(enabled: Boolean) {
+        userPreferences.setVibrateOnSend(enabled)
+    }
+
+    fun setShowCharacterCounter(enabled: Boolean) {
+        userPreferences.setShowCharacterCounter(enabled)
+    }
+
+    fun unblockContact(phoneNumber: String) {
+        viewModelScope.launch {
+            messageRepository.unblockContact(phoneNumber)
+        }
+    }
+
+    fun cancelScheduledMessage(id: Long) {
+        viewModelScope.launch {
+            messageRepository.cancelScheduledMessage(id)
+        }
+    }
+
+    fun sendScheduledMessageNow(scheduled: ScheduledMessageEntity) {
+        viewModelScope.launch {
+            messageRepository.sendScheduledMessageNow(
+                id = scheduled.id,
+                recipientPhone = scheduled.recipientPhoneNumber,
+                recipientName = scheduled.recipientName,
+                content = scheduled.content
+            )
+        }
     }
 }

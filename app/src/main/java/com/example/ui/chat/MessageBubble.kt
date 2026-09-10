@@ -1,11 +1,7 @@
 package com.example.ui.chat
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,16 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -37,19 +31,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
-import com.example.data.local.entity.MessageType
-import com.example.ui.theme.SmsBadgeBgDark
-import com.example.ui.theme.SmsBadgeBgLight
-import com.example.ui.theme.SmsBadgeTextDark
-import com.example.ui.theme.SmsBadgeTextLight
-import com.example.ui.theme.SmsBubbleDark
-import com.example.ui.theme.SmsBubbleLight
 import com.example.ui.util.TimeFormatter
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -60,13 +46,23 @@ fun MessageBubble(
     isFirstInGroup: Boolean,
     isLastInGroup: Boolean,
     reactionEmoji: String?,
+    bubbleShape: String = "ROUNDED",
+    fontSize: String = "NORMAL",
+    customColorHex: String? = null,
     onLongClick: () -> Unit,
-    onFallbackClick: () -> Unit
+    onRetryClick: () -> Unit
 ) {
-    val outerRadius = 20.dp
-    val innerRadius = 4.dp
+    val outerRadius = when (bubbleShape) {
+        "PILL" -> 24.dp
+        "SQUARE" -> 8.dp
+        else -> 18.dp
+    }
+    val innerRadius = when (bubbleShape) {
+        "PILL" -> 10.dp
+        "SQUARE" -> 4.dp
+        else -> 4.dp
+    }
 
-    // Asymmetric Corner Radii calculation
     val shape = if (isFromMe) {
         RoundedCornerShape(
             topStart = outerRadius,
@@ -83,14 +79,29 @@ fun MessageBubble(
         )
     }
 
+    val customColor = customColorHex?.let {
+        try {
+            Color(android.graphics.Color.parseColor(it))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     val backgroundColor = when {
-        isFromMe -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        isFromMe -> customColor ?: MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
     }
 
     val contentColor = when {
         isFromMe -> MaterialTheme.colorScheme.onPrimary
         else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val textStyle = when (fontSize) {
+        "SMALL" -> MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp)
+        "LARGE" -> MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp)
+        "EXTRA_LARGE" -> MaterialTheme.typography.bodyLarge.copy(fontSize = 19.sp)
+        else -> MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp)
     }
 
     Column(
@@ -104,7 +115,7 @@ fun MessageBubble(
             color = backgroundColor,
             contentColor = contentColor,
             modifier = Modifier
-                .widthIn(max = 280.dp)
+                .widthIn(max = 290.dp)
                 .combinedClickable(
                     onClick = {},
                     onLongClick = onLongClick
@@ -128,12 +139,14 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // Text Content
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor
-                )
+                // Text Content with Partial Selection Container
+                SelectionContainer {
+                    Text(
+                        text = message.content,
+                        style = textStyle,
+                        color = contentColor
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -162,23 +175,15 @@ fun MessageBubble(
                             MessageStatus.SENT -> {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "Sent",
+                                    contentDescription = "Sent (1 mark)",
                                     modifier = Modifier.size(12.dp),
                                     tint = contentColor
                                 )
                             }
-                            MessageStatus.DELIVERED -> {
+                            MessageStatus.DELIVERED, MessageStatus.READ -> {
                                 Icon(
                                     imageVector = Icons.Default.DoneAll,
-                                    contentDescription = "Delivered",
-                                    modifier = Modifier.size(14.dp),
-                                    tint = contentColor
-                                )
-                            }
-                            MessageStatus.READ -> {
-                                Icon(
-                                    imageVector = Icons.Default.DoneAll,
-                                    contentDescription = "Read",
+                                    contentDescription = "Delivered (2 marks)",
                                     modifier = Modifier.size(14.dp),
                                     tint = contentColor
                                 )
@@ -214,13 +219,13 @@ fun MessageBubble(
             }
         }
 
-        // Smart Fallback prompt if internet message failed
+        // Retry prompt if SMS failed to send
         if (isFromMe && message.status == MessageStatus.FAILED) {
             OutlinedButton(
-                onClick = onFallbackClick,
+                onClick = onRetryClick,
                 modifier = Modifier
                     .padding(top = 4.dp)
-                    .testTag("send_as_sms_fallback_button"),
+                    .testTag("retry_message_button"),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
@@ -232,7 +237,7 @@ fun MessageBubble(
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Not delivered. Tap to send as SMS", style = MaterialTheme.typography.labelSmall)
+                Text("Failed to send. Tap to retry", style = MaterialTheme.typography.labelSmall)
             }
         }
     }

@@ -24,7 +24,15 @@ class SmsReceiver : BroadcastReceiver() {
             if (!messages.isNullOrEmpty()) {
                 val db = PulseChatDatabase.getDatabase(context)
                 val contactRepo = ContactRepository()
-                val messageRepo = MessageRepository(context, db.conversationDao(), db.messageDao(), contactRepo)
+                val messageRepo = MessageRepository(
+                    context,
+                    db.conversationDao(),
+                    db.messageDao(),
+                    db.scheduledMessageDao(),
+                    db.blockedContactDao(),
+                    db.quickResponseDao(),
+                    contactRepo
+                )
 
                 val scope = CoroutineScope(Dispatchers.IO)
                 scope.launch {

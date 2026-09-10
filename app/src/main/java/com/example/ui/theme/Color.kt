@@ -2,19 +2,19 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Brand Colors (PaiChat Blue)
+// Primary Brand Colors (Vibrant Blue)
 val PrimaryLight = Color(0xFF005AC1)
 val OnPrimaryLight = Color(0xFFFFFFFF)
 val PrimaryContainerLight = Color(0xFFD8E2FF)
 val OnPrimaryContainerLight = Color(0xFF001A41)
 
-// Teal Theme
-val PrimaryTealLight = Color(0xFF006A67)
-val PrimaryTealContainerLight = Color(0xFF9CF1EC)
-val OnPrimaryTealContainerLight = Color(0xFF00201F)
-val PrimaryTealDark = Color(0xFF4CF6EE)
-val PrimaryTealContainerDark = Color(0xFF00504E)
-val OnPrimaryTealContainerDark = Color(0xFF9CF1EC)
+// Indigo Theme
+val PrimaryIndigoLight = Color(0xFF3B5BA9)
+val PrimaryIndigoContainerLight = Color(0xFFDAE2FF)
+val OnPrimaryIndigoContainerLight = Color(0xFF001947)
+val PrimaryIndigoDark = Color(0xFFB1C5FF)
+val PrimaryIndigoContainerDark = Color(0xFF1F428F)
+val OnPrimaryIndigoContainerDark = Color(0xFFDAE2FF)
 
 // Purple Theme
 val PrimaryPurpleLight = Color(0xFF6B4FA0)
@@ -24,14 +24,13 @@ val PrimaryPurpleDark = Color(0xFFD4BBFF)
 val PrimaryPurpleContainerDark = Color(0xFF523786)
 val OnPrimaryPurpleContainerDark = Color(0xFFEBDCFF)
 
-// Emerald Theme
-val PrimaryEmeraldLight = Color(0xFF1B6C43)
-val PrimaryEmeraldContainerLight = Color(0xFFA5F5BE)
-val OnPrimaryEmeraldContainerLight = Color(0xFF002110)
-val PrimaryEmeraldDark = Color(0xFF8CD8A4)
-val PrimaryEmeraldContainerDark = Color(0xFF00522C)
-val OnPrimaryEmeraldContainerDark = Color(0xFFA5F5BE)
-
+// Rose Theme
+val PrimaryRoseLight = Color(0xFF9B4055)
+val PrimaryRoseContainerLight = Color(0xFFFFD9DF)
+val OnPrimaryRoseContainerLight = Color(0xFF3F0015)
+val PrimaryRoseDark = Color(0xFFFFB1C1)
+val PrimaryRoseContainerDark = Color(0xFF7D293E)
+val OnPrimaryRoseContainerDark = Color(0xFFFFD9DF)
 
 val SecondaryLight = Color(0xFF535F70)
 val OnSecondaryLight = Color(0xFFFFFFFF)
@@ -63,10 +62,10 @@ val OnPrimaryContainerDark = Color(0xFFD8E2FF)
 
 val SecondaryDark = Color(0xFFBBC7DB)
 val OnSecondaryDark = Color(0xFF253140)
-val SecondaryContainerDark = Color(0xFF3B4758)
+val SecondaryContainerDark = Color(0xFF3B4858)
 val OnSecondaryContainerDark = Color(0xFFD7E3F7)
 
-val TertiaryDark = Color(0xFFDDCEE3)
+val TertiaryDark = Color(0xFFDCBCE0)
 val OnTertiaryDark = Color(0xFF3F2844)
 val TertiaryContainerDark = Color(0xFF573E5C)
 val OnTertiaryContainerDark = Color(0xFFFAD8FD)
@@ -81,20 +80,20 @@ val OnBackgroundDark = Color(0xFFE2E2E9)
 val SurfaceDark = Color(0xFF111318)
 val OnSurfaceDark = Color(0xFFE2E2E9)
 val SurfaceVariantDark = Color(0xFF44474F)
-val OnSurfaceVariantDark = Color(0xFFC5C6D0)
+val OnSurfaceVariantDark = Color(0xFFC4C6D0)
 
-// Message distinction colors (Internet vs SMS)
-val InternetBubbleLight = Color(0xFF005AC1)
-val OnInternetBubbleLight = Color(0xFFFFFFFF)
-val InternetBubbleDark = Color(0xFF3B82F6)
-val OnInternetBubbleDark = Color(0xFFFFFFFF)
+// Custom Message Bubble Badges (Non-green)
+val SmsBadgeBgLight = Color(0xFFE0E7FF)
+val SmsBadgeTextLight = Color(0xFF1E3A8A)
+val SmsBadgeBgDark = Color(0xFF1E293B)
+val SmsBadgeTextDark = Color(0xFF93C5FD)
 
-val SmsBubbleLight = Color(0xFFE0E2EC)
-val OnSmsBubbleLight = Color(0xFF191C20)
-val SmsBubbleDark = Color(0xFF2C3038)
-val OnSmsBubbleDark = Color(0xFFE2E2E9)
+val BubbleSentLight = Color(0xFF005AC1)
+val BubbleSentTextLight = Color(0xFFFFFFFF)
+val BubbleReceivedLight = Color(0xFFEDEFEF)
+val BubbleReceivedTextLight = Color(0xFF191C20)
 
-val SmsBadgeBgLight = Color(0xFF535F70)
-val SmsBadgeTextLight = Color(0xFFFFFFFF)
-val SmsBadgeBgDark = Color(0xFF3B4758)
-val SmsBadgeTextDark = Color(0xFFD7E3F7)
+val BubbleSentDark = Color(0xFF004494)
+val BubbleSentTextDark = Color(0xFFFFFFFF)
+val BubbleReceivedDark = Color(0xFF282A2F)
+val BubbleReceivedTextDark = Color(0xFFE2E2E9)

@@ -12,9 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 data class Contact(
     val phoneNumber: String,
     val name: String,
-    val avatarId: String,
-    val isInternetUser: Boolean,
-    val statusText: String = if (isInternetUser) "Internet Chat (Online)" else "Regular Text (SMS)"
+    val isInternetUser: Boolean = false,
+    val statusText: String = "SMS (SIM Card)"
 )
 
 class ContactRepository {
@@ -22,11 +21,6 @@ class ContactRepository {
     // Real contacts loaded from phone and conversations
     private val _registeredContacts = MutableStateFlow<List<Contact>>(emptyList())
     val registeredContacts: StateFlow<List<Contact>> = _registeredContacts.asStateFlow()
-
-    fun isContactInternetUser(phoneNumber: String): Boolean {
-        val normalized = normalizePhoneNumber(phoneNumber)
-        return _registeredContacts.value.find { normalizePhoneNumber(it.phoneNumber) == normalized }?.isInternetUser ?: false
-    }
 
     fun getContactByPhoneNumber(phoneNumber: String): Contact? {
         val normalized = normalizePhoneNumber(phoneNumber)
@@ -66,7 +60,6 @@ class ContactRepository {
                 val numberIndex = it.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
 
                 val updatedList = _registeredContacts.value.toMutableList()
-                var avatarCounter = 1
 
                 while (it.moveToNext()) {
                     val name = if (nameIndex >= 0) it.getString(nameIndex) else "Contact"
@@ -76,15 +69,12 @@ class ContactRepository {
                         val norm = normalizePhoneNumber(number)
                         val existingIndex = updatedList.indexOfFirst { c -> normalizePhoneNumber(c.phoneNumber) == norm }
                         if (existingIndex < 0) {
-                            val avatarId = "avatar_${(avatarCounter % 5) + 1}"
-                            avatarCounter++
                             updatedList.add(
                                 Contact(
                                     phoneNumber = number,
                                     name = name ?: number,
-                                    avatarId = avatarId,
                                     isInternetUser = false,
-                                    statusText = "Regular Text (SMS)"
+                                    statusText = "SMS (SIM Card)"
                                 )
                             )
                         }

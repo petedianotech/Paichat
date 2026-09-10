@@ -26,6 +26,9 @@ class PulseChatViewModelFactory(
             context = context,
             conversationDao = database.conversationDao(),
             messageDao = database.messageDao(),
+            scheduledMessageDao = database.scheduledMessageDao(),
+            blockedContactDao = database.blockedContactDao(),
+            quickResponseDao = database.quickResponseDao(),
             contactRepository = contactRepository
         )
     }
@@ -34,13 +37,13 @@ class PulseChatViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
             modelClass.isAssignableFrom(OnboardingViewModel::class.java) -> {
-                OnboardingViewModel(userPreferences, messageRepository) as T
+                OnboardingViewModel(userPreferences, messageRepository, contactRepository) as T
             }
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
                 HomeViewModel(messageRepository, contactRepository, userPreferences) as T
             }
             modelClass.isAssignableFrom(NewChatViewModel::class.java) -> {
-                NewChatViewModel(contactRepository) as T
+                NewChatViewModel(contactRepository, messageRepository) as T
             }
             modelClass.isAssignableFrom(ChatViewModel::class.java) -> {
                 requireNotNull(conversationId) { "conversationId is required for ChatViewModel" }

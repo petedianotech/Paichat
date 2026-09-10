@@ -1,14 +1,9 @@
 package com.example.ui.onboarding
 
 import android.Manifest
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,16 +15,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Contacts
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,7 +32,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,14 +41,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import com.example.ui.util.AvatarUtil
+import androidx.compose.ui.unit.sp
+import com.example.ui.theme.LocalThemeGradient
 
 @Composable
 fun OnboardingScreen(
@@ -63,245 +56,259 @@ fun OnboardingScreen(
     onOnboardingComplete: () -> Unit
 ) {
     val context = LocalContext.current
-    val phoneNumber by viewModel.phoneNumber.collectAsState()
-    val displayName by viewModel.displayName.collectAsState()
-    val selectedAvatar by viewModel.selectedAvatar.collectAsState()
-    val isDefaultSmsApp by viewModel.isDefaultSmsApp.collectAsState()
+    val isDefaultSms by viewModel.isDefaultSmsApp.collectAsState()
+    val hasPermissions by viewModel.hasPermissions.collectAsState()
 
-    val smsRoleLauncher = rememberLauncherForActivityResult(
+    val defaultSmsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
-        viewModel.checkDefaultSmsStatus(context)
+        viewModel.checkStatus(context)
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val permissionsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        viewModel.checkDefaultSmsStatus(context)
+        viewModel.checkStatus(context)
     }
 
     LaunchedEffect(Unit) {
-        viewModel.checkDefaultSmsStatus(context)
-        permissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.SEND_SMS,
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.READ_SMS,
-                Manifest.permission.READ_CONTACTS
-            )
-        )
+        viewModel.checkStatus(context)
     }
 
-    Scaffold { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(16.dp))
+    val backgroundGradient = LocalThemeGradient.current
 
-            // Header Icon & Title
-            Box(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundGradient)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent
+        ) { paddingValues ->
+            Column(
                 modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = Icons.Default.Sms,
-                    contentDescription = null,
-                    modifier = Modifier.size(36.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Spacer(modifier = Modifier.height(24.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Welcome to PaiChat",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Text(
-                text = "Free online chat and standard text messages together.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-            )
-
-            // Avatar Picker
-            Text(
-                text = "Choose Avatar",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp)
-            )
-
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(AvatarUtil.avatarPresets) { (id, url) ->
-                    val isSelected = selectedAvatar == id
+                    // App Icon Header
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
+                            .size(80.dp)
                             .clip(CircleShape)
-                            .border(
-                                width = if (isSelected) 3.dp else 1.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                shape = CircleShape
-                            )
-                            .clickable { viewModel.selectAvatar(id) }
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
                     ) {
-                        AsyncImage(
-                            model = url,
-                            contentDescription = "Avatar",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
+                        Icon(
+                            imageVector = Icons.Default.Forum,
+                            contentDescription = "SMS Messenger",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(44.dp)
                         )
-                        if (isSelected) {
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Messages",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Fast, reliable SMS messaging powered directly by your SIM card with delivery reports.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Card 1: Default SMS App
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("default_sms_card"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (isDefaultSms) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else MaterialTheme.colorScheme.secondaryContainer
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Selected",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(24.dp)
+                                    imageVector = if (isDefaultSms) Icons.Default.CheckCircle else Icons.Default.Sms,
+                                    contentDescription = null,
+                                    tint = if (isDefaultSms) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Default SMS App",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (isDefaultSms) "App is set as default SMS handler" else "Required to receive and manage all SMS",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            if (!isDefaultSms) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val intent = viewModel.createDefaultSmsIntent(context)
+                                        if (intent != null) {
+                                            defaultSmsLauncher.launch(intent)
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.testTag("set_default_sms_button")
+                                ) {
+                                    Text("Set Default", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Card 2: Permissions
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("permissions_card"),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (hasPermissions) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else MaterialTheme.colorScheme.secondaryContainer
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (hasPermissions) Icons.Default.CheckCircle else Icons.Default.Contacts,
+                                    contentDescription = null,
+                                    tint = if (hasPermissions) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "SMS & Contacts Access",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (hasPermissions) "All permissions granted" else "Required to read SIM messages and contacts",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            if (!hasPermissions) {
+                                OutlinedButton(
+                                    onClick = {
+                                        permissionsLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.SEND_SMS,
+                                                Manifest.permission.RECEIVE_SMS,
+                                                Manifest.permission.READ_SMS,
+                                                Manifest.permission.READ_CONTACTS
+                                            )
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.testTag("grant_permissions_button")
+                                ) {
+                                    Text("Grant", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Input Fields
-            OutlinedTextField(
-                value = displayName,
-                onValueChange = { viewModel.updateDisplayName(it) },
-                label = { Text("Your Name") },
-                placeholder = { Text("e.g. Alex Rivera") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-                    .testTag("display_name_input")
-            )
-
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = { viewModel.updatePhoneNumber(it) },
-                label = { Text("Your Phone Number") },
-                placeholder = { Text("+1234567890") },
-                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-                    .testTag("phone_number_input")
-            )
-
-            // Default SMS App Status & Role Prompt Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                )
-            ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(top = 32.dp, bottom = 12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Sms,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Button(
+                        onClick = {
+                            viewModel.completeOnboarding(context, onOnboardingComplete)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp)
+                            .testTag("start_messaging_button"),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
                         Text(
-                            text = "Main Text Message App",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            text = "Start Messaging",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
                         )
-                        Text(
-                            text = if (isDefaultSmsApp) "PaiChat is your main text message app." else "Make PaiChat your main text app to send and receive SMS.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    if (isDefaultSmsApp) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Active",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    } else {
-                        OutlinedButton(
-                            onClick = {
-                                val intent = viewModel.createDefaultSmsIntent(context)
-                                if (intent != null) {
-                                    smsRoleLauncher.launch(intent)
-                                } else {
-                                    val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                        data = Uri.fromParts("package", context.packageName, null)
-                                    }
-                                    context.startActivity(settingsIntent)
-                                }
-                            },
-                            modifier = Modifier.testTag("set_default_sms_button")
-                        ) {
-                            Text("Set")
-                        }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Button(
-                onClick = {
-                    viewModel.completeOnboarding(onOnboardingComplete)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .testTag("get_started_button"),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(
-                    text = "Get Started",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
             }
         }
     }

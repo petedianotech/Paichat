@@ -44,13 +44,13 @@ fun PulseChatNavHost(
 ) {
     val context = LocalContext.current
     val userPreferences = remember(context) { UserPreferences(context) }
-    val userProfile by userPreferences.userProfile.collectAsState()
+    val appSettings by userPreferences.appSettings.collectAsState()
 
-    val startDestination = if (userProfile.isOnboarded) Routes.HOME else Routes.ONBOARDING
+    val startDestination = if (appSettings.isOnboarded) Routes.HOME else Routes.ONBOARDING
 
     PaiChatTheme(
-        themeMode = userProfile.themeMode,
-        colorTheme = userProfile.colorTheme
+        themeMode = appSettings.themeMode,
+        colorTheme = appSettings.colorTheme
     ) {
         Surface(modifier = Modifier.fillMaxSize()) {
             NavHost(

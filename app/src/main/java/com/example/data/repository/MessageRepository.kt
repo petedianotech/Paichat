@@ -11,20 +11,24 @@ import android.os.Build
 import android.provider.Telephony
 import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
+import com.example.data.local.dao.BlockedContactDao
 import com.example.data.local.dao.ConversationDao
 import com.example.data.local.dao.MessageDao
+import com.example.data.local.dao.QuickResponseDao
+import com.example.data.local.dao.ScheduledMessageDao
+import com.example.data.local.entity.BlockedContactEntity
 import com.example.data.local.entity.ConversationEntity
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
-import com.example.data.remote.OnlineChatManager
+import com.example.data.local.entity.QuickResponseEntity
+import com.example.data.local.entity.ScheduledMessageEntity
 import com.example.data.sync.SmsSyncHelper
 import com.example.receiver.SmsStatusReceiver
 import com.example.ui.util.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -32,24 +36,39 @@ class MessageRepository(
     private val context: Context,
     private val conversationDao: ConversationDao,
     private val messageDao: MessageDao,
+    private val scheduledMessageDao: ScheduledMessageDao,
+    private val blockedContactDao: BlockedContactDao,
+    private val quickResponseDao: QuickResponseDao,
     private val contactRepository: ContactRepository
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val smsSyncHelper = SmsSyncHelper(context, conversationDao, messageDao, contactRepository)
-    val onlineChatManager = OnlineChatManager(context, conversationDao, messageDao, contactRepository)
 
-    val isOnlineConnected: StateFlow<Boolean> = onlineChatManager.isOnlineConnected
-
-    fun startOnlineSync(myPhoneNumber: String) {
-        onlineChatManager.start(myPhoneNumber)
+    init {
+        scope.launch {
+            seedDefaultQuickResponsesIfNeeded()
+        }
     }
 
-    fun stopOnlineSync() {
-        onlineChatManager.stop()
+    private suspend fun seedDefaultQuickResponsesIfNeeded() {
+        if (quickResponseDao.getCount() == 0) {
+            val defaults = listOf(
+                QuickResponseEntity(text = "I'm on my way!", isDefault = true, orderIndex = 0),
+                QuickResponseEntity(text = "Can't talk right now, text you later.", isDefault = true, orderIndex = 1),
+                QuickResponseEntity(text = "Sounds good, let's do it!", isDefault = true, orderIndex = 2),
+                QuickResponseEntity(text = "Please call me when you get a chance.", isDefault = true, orderIndex = 3),
+                QuickResponseEntity(text = "Running about 5 minutes late!", isDefault = true, orderIndex = 4),
+                QuickResponseEntity(text = "Thanks! Talk soon.", isDefault = true, orderIndex = 5)
+            )
+            quickResponseDao.insertQuickResponses(defaults)
+        }
     }
 
     fun getAllConversations(): Flow<List<ConversationEntity>> =
         conversationDao.getAllConversations()
+
+    fun getBlockedConversations(): Flow<List<ConversationEntity>> =
+        conversationDao.getBlockedConversations()
 
     fun getConversationById(id: String): Flow<ConversationEntity?> =
         conversationDao.getConversationById(id)
@@ -57,24 +76,117 @@ class MessageRepository(
     fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>> =
         messageDao.getMessagesForConversation(conversationId)
 
+    fun getScheduledMessagesForConversation(conversationId: String): Flow<List<ScheduledMessageEntity>> =
+        scheduledMessageDao.getPendingForConversation(conversationId)
+
+    fun getAllScheduledMessages(): Flow<List<ScheduledMessageEntity>> =
+        scheduledMessageDao.getAllPendingScheduledMessages()
+
+    fun getAllBlockedContacts(): Flow<List<BlockedContactEntity>> =
+        blockedContactDao.getAllBlocked()
+
+    fun getAllQuickResponses(): Flow<List<QuickResponseEntity>> =
+        quickResponseDao.getAllQuickResponses()
+
+    suspend fun addQuickResponse(text: String) {
+        quickResponseDao.insertQuickResponse(
+            QuickResponseEntity(text = text.trim(), isDefault = false)
+        )
+    }
+
+    suspend fun deleteQuickResponse(id: Long) {
+        quickResponseDao.deleteQuickResponse(id)
+    }
+
     suspend fun clearUnreadCount(conversationId: String) {
         conversationDao.clearUnreadCount(conversationId)
     }
 
-    suspend fun syncDeviceSms(userPhoneNumber: String): Int {
-        return smsSyncHelper.syncDeviceSms(userPhoneNumber)
+    suspend fun markAsUnread(conversationId: String) {
+        conversationDao.markAsUnread(conversationId)
     }
 
-    suspend fun sendMessage(
-        senderPhone: String,
+    suspend fun setPinned(conversationId: String, isPinned: Boolean) {
+        conversationDao.setPinned(conversationId, isPinned)
+    }
+
+    suspend fun setConversationCustomColor(conversationId: String, colorHex: String?) {
+        conversationDao.setCustomColor(conversationId, colorHex)
+    }
+
+    suspend fun blockContact(phoneNumber: String, contactName: String?, reason: String? = null) {
+        blockedContactDao.block(
+            BlockedContactEntity(
+                phoneNumber = phoneNumber,
+                contactName = contactName,
+                blockedTimestamp = System.currentTimeMillis(),
+                reason = reason
+            )
+        )
+        conversationDao.setBlocked(phoneNumber, true)
+    }
+
+    suspend fun unblockContact(phoneNumber: String) {
+        blockedContactDao.unblock(phoneNumber)
+        conversationDao.setBlocked(phoneNumber, false)
+    }
+
+    suspend fun isContactBlocked(phoneNumber: String): Boolean {
+        return blockedContactDao.isBlocked(phoneNumber)
+    }
+
+    suspend fun scheduleMessage(
         recipientPhone: String,
         recipientName: String?,
         content: String,
-        forcedMessageType: MessageType? = null,
-        mediaUrl: String? = null
+        scheduledTimestamp: Long
+    ): Long {
+        val conversationId = recipientPhone
+        val entity = ScheduledMessageEntity(
+            conversationId = conversationId,
+            recipientPhoneNumber = recipientPhone,
+            recipientName = recipientName,
+            content = content,
+            scheduledTimestamp = scheduledTimestamp,
+            isSent = false
+        )
+        return scheduledMessageDao.insert(entity)
+    }
+
+    suspend fun cancelScheduledMessage(id: Long) {
+        scheduledMessageDao.deleteById(id)
+    }
+
+    suspend fun sendScheduledMessageNow(id: Long, recipientPhone: String, recipientName: String?, content: String) {
+        scheduledMessageDao.deleteById(id)
+        sendMessage(recipientPhone, recipientName, content)
+    }
+
+    suspend fun checkAndDispatchDueScheduledMessages() {
+        val now = System.currentTimeMillis()
+        val dueMessages = scheduledMessageDao.getDueScheduledMessages(now)
+        for (scheduled in dueMessages) {
+            scheduledMessageDao.markAsSent(scheduled.id)
+            sendMessage(
+                recipientPhone = scheduled.recipientPhoneNumber,
+                recipientName = scheduled.recipientName,
+                content = scheduled.content
+            )
+        }
+    }
+
+    suspend fun syncDeviceSms(): Int {
+        return smsSyncHelper.syncDeviceSms()
+    }
+
+    suspend fun sendMessage(
+        recipientPhone: String,
+        recipientName: String?,
+        content: String,
+        mediaUrl: String? = null,
+        subscriptionId: Int? = null
     ): MessageEntity {
         val conversationId = recipientPhone
-        val isInternet = false
         val messageType = MessageType.SMS
 
         // 1. Ensure conversation exists
@@ -88,18 +200,21 @@ class MessageRepository(
             lastMessage = if (mediaUrl != null) "Photo" else content,
             lastMessageTimestamp = timestamp,
             unreadCount = 0,
-            isInternetUser = false
+            isInternetUser = false,
+            isPinned = existingConversation?.isPinned ?: false,
+            isBlocked = existingConversation?.isBlocked ?: false,
+            customColorHex = existingConversation?.customColorHex
         )
         conversationDao.insertConversation(updatedConversation)
 
-        // 2. Create message
+        // 2. Create message (sender is always "ME" for outgoing)
         val messageId = UUID.randomUUID().toString()
         val initialStatus = MessageStatus.SENDING
 
         val message = MessageEntity(
             messageId = messageId,
             conversationId = conversationId,
-            senderPhoneNumber = senderPhone,
+            senderPhoneNumber = "ME",
             recipientPhoneNumber = recipientPhone,
             content = content,
             timestamp = timestamp,
@@ -109,29 +224,49 @@ class MessageRepository(
         )
         messageDao.insertMessage(message)
 
-        // 3. Process dispatch based on message type
-        if (messageType == MessageType.INTERNET) {
-            scope.launch {
-                val myName = existingConversation?.contactName ?: "User"
-                onlineChatManager.sendOnlineMessage(
-                    messageId = messageId,
-                    senderPhone = senderPhone,
-                    senderName = myName,
-                    recipientPhone = recipientPhone,
-                    content = content,
-                    mediaUrl = mediaUrl
-                )
-            }
-        } else {
-            scope.launch {
-                sendSmsMessageProcess(messageId, recipientPhone, content)
-            }
+        // 3. Dispatch real SMS via SIM card
+        scope.launch {
+            sendSmsMessageProcess(messageId, recipientPhone, content, subscriptionId)
         }
 
         return message
     }
 
-    private suspend fun sendSmsMessageProcess(messageId: String, recipientPhone: String, content: String) {
+    suspend fun sendBroadcastOrGroupSms(
+        recipients: List<String>,
+        content: String,
+        subscriptionId: Int? = null
+    ) {
+        for (phone in recipients) {
+            val contact = contactRepository.getContactByPhoneNumber(phone)
+            sendMessage(
+                recipientPhone = phone,
+                recipientName = contact?.name,
+                content = content,
+                subscriptionId = subscriptionId
+            )
+        }
+    }
+
+    suspend fun retryMessage(messageId: String) {
+        val message = messageDao.getMessageById(messageId) ?: return
+        val updated = message.copy(
+            status = MessageStatus.SENDING,
+            timestamp = System.currentTimeMillis()
+        )
+        messageDao.updateMessage(updated)
+
+        scope.launch {
+            sendSmsMessageProcess(messageId, message.recipientPhoneNumber, message.content, null)
+        }
+    }
+
+    private suspend fun sendSmsMessageProcess(
+        messageId: String,
+        recipientPhone: String,
+        content: String,
+        subscriptionId: Int?
+    ) {
         val hasSendPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.SEND_SMS
@@ -143,13 +278,30 @@ class MessageRepository(
         }
 
         try {
-            val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                context.getSystemService(SmsManager::class.java)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                context.getSystemService(SmsManager::class.java)
-            } else {
+            val smsManager: SmsManager? = try {
+                if (subscriptionId != null && subscriptionId >= 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        context.getSystemService(SmsManager::class.java)?.createForSubscriptionId(subscriptionId)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        SmsManager.getSmsManagerForSubscriptionId(subscriptionId)
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    context.getSystemService(SmsManager::class.java) ?: @Suppress("DEPRECATION") SmsManager.getDefault()
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    context.getSystemService(SmsManager::class.java) ?: @Suppress("DEPRECATION") SmsManager.getDefault()
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getDefault()
+                }
+            } catch (_: Exception) {
                 @Suppress("DEPRECATION")
                 SmsManager.getDefault()
+            }
+
+            if (smsManager == null) {
+                messageDao.updateMessageStatus(messageId, MessageStatus.FAILED)
+                return
             }
 
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -172,7 +324,7 @@ class MessageRepository(
                 flags
             )
 
-            val parts = smsManager?.divideMessage(content) ?: ArrayList<String>().apply { add(content) }
+            val parts = smsManager.divideMessage(content) ?: ArrayList<String>().apply { add(content) }
             if (parts.size > 1) {
                 val sentIntents = ArrayList<PendingIntent>()
                 val deliveryIntents = ArrayList<PendingIntent>()
@@ -180,9 +332,9 @@ class MessageRepository(
                     sentIntents.add(sentIntent)
                     deliveryIntents.add(deliveryIntent)
                 }
-                smsManager?.sendMultipartTextMessage(recipientPhone, null, parts, sentIntents, deliveryIntents)
+                smsManager.sendMultipartTextMessage(recipientPhone, null, parts, sentIntents, deliveryIntents)
             } else {
-                smsManager?.sendTextMessage(recipientPhone, null, content, sentIntent, deliveryIntent)
+                smsManager.sendTextMessage(recipientPhone, null, content, sentIntent, deliveryIntent)
             }
 
             // Save to system sent box if permitted
@@ -203,20 +355,6 @@ class MessageRepository(
         }
     }
 
-    suspend fun fallbackToSendAsSms(messageId: String) {
-        val message = messageDao.getMessageById(messageId) ?: return
-        val updatedMessage = message.copy(
-            messageType = MessageType.SMS,
-            status = MessageStatus.SENDING,
-            timestamp = System.currentTimeMillis()
-        )
-        messageDao.updateMessage(updatedMessage)
-
-        scope.launch {
-            sendSmsMessageProcess(messageId, message.recipientPhoneNumber, message.content)
-        }
-    }
-
     suspend fun receiveIncomingMessage(
         senderPhone: String,
         senderName: String?,
@@ -224,12 +362,16 @@ class MessageRepository(
         messageType: MessageType = MessageType.SMS,
         mediaUrl: String? = null
     ) {
+        // Drop message if blocked
+        if (blockedContactDao.isBlocked(senderPhone)) {
+            return
+        }
+
         val conversationId = senderPhone
         val timestamp = System.currentTimeMillis()
         val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
 
         val unread = (existingConversation?.unreadCount ?: 0) + 1
-        val isInternet = false
         val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
 
         val conversation = ConversationEntity(
@@ -239,7 +381,10 @@ class MessageRepository(
             lastMessage = if (mediaUrl != null) "Photo" else content,
             lastMessageTimestamp = timestamp,
             unreadCount = unread,
-            isInternetUser = false
+            isInternetUser = false,
+            isPinned = existingConversation?.isPinned ?: false,
+            isBlocked = false,
+            customColorHex = existingConversation?.customColorHex
         )
         conversationDao.insertConversation(conversation)
 

@@ -1,6 +1,6 @@
 {
-  "name": "PaiChat",
-  "description": "Simple and fast mobile messaging app for free internet chat and regular text messages.",
+  "name": "Messages",
+  "description": "Clean, reliable SMS messaging app sending directly via SIM card with delivery reports, status ticks, and default SMS handler support.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
