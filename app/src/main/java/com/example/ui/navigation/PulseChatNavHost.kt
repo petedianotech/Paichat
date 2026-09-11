@@ -1,8 +1,10 @@
 package com.example.ui.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -26,7 +28,6 @@ import com.example.ui.onboarding.OnboardingScreen
 import com.example.ui.onboarding.OnboardingViewModel
 import com.example.ui.profile.ProfileScreen
 import com.example.ui.profile.ProfileViewModel
-import com.example.ui.theme.PaiChatTheme
 
 object Routes {
     const val ONBOARDING = "onboarding"
@@ -35,11 +36,15 @@ object Routes {
     const val CHAT = "chat/{conversationId}"
     const val PROFILE = "profile"
 
-    fun buildChatRoute(conversationId: String) = "chat/$conversationId"
+    fun buildChatRoute(conversationId: String): String {
+        val encoded = Uri.encode(conversationId)
+        return "chat/$encoded"
+    }
 }
 
 @Composable
 fun PulseChatNavHost(
+    initialConversationId: String? = null,
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current
@@ -48,81 +53,84 @@ fun PulseChatNavHost(
 
     val startDestination = if (appSettings.isOnboarded) Routes.HOME else Routes.ONBOARDING
 
-    PaiChatTheme(
-        themeMode = appSettings.themeMode,
-        colorTheme = appSettings.colorTheme
-    ) {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            NavHost(
-                navController = navController,
-                startDestination = startDestination
-            ) {
-                composable(Routes.ONBOARDING) {
-                    val factory = PulseChatViewModelFactory(context)
-                    val viewModel: OnboardingViewModel = viewModel(factory = factory)
-                    OnboardingScreen(
-                        viewModel = viewModel,
-                        onOnboardingComplete = {
-                            navController.navigate(Routes.HOME) {
-                                popUpTo(Routes.ONBOARDING) { inclusive = true }
-                            }
+    LaunchedEffect(initialConversationId) {
+        if (!initialConversationId.isNullOrBlank()) {
+            navController.navigate(Routes.buildChatRoute(initialConversationId))
+        }
+    }
+
+    Surface(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination
+        ) {
+            composable(Routes.ONBOARDING) {
+                val factory = PulseChatViewModelFactory(context)
+                val viewModel: OnboardingViewModel = viewModel(factory = factory)
+                OnboardingScreen(
+                    viewModel = viewModel,
+                    onOnboardingComplete = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.ONBOARDING) { inclusive = true }
                         }
-                    )
-                }
+                    }
+                )
+            }
 
-                composable(Routes.HOME) {
-                    val factory = PulseChatViewModelFactory(context)
-                    val viewModel: HomeViewModel = viewModel(factory = factory)
-                    HomeScreen(
-                        viewModel = viewModel,
-                        onNavigateToChat = { conversationId ->
-                            navController.navigate(Routes.buildChatRoute(conversationId))
-                        },
-                        onNavigateToNewChat = {
-                            navController.navigate(Routes.NEW_CHAT)
-                        },
-                        onNavigateToProfile = {
-                            navController.navigate(Routes.PROFILE)
+            composable(Routes.HOME) {
+                val factory = PulseChatViewModelFactory(context)
+                val viewModel: HomeViewModel = viewModel(factory = factory)
+                HomeScreen(
+                    viewModel = viewModel,
+                    onNavigateToChat = { conversationId ->
+                        navController.navigate(Routes.buildChatRoute(conversationId))
+                    },
+                    onNavigateToNewChat = {
+                        navController.navigate(Routes.NEW_CHAT)
+                    },
+                    onNavigateToProfile = {
+                        navController.navigate(Routes.PROFILE)
+                    }
+                )
+            }
+
+            composable(Routes.NEW_CHAT) {
+                val factory = PulseChatViewModelFactory(context)
+                val viewModel: NewChatViewModel = viewModel(factory = factory)
+                NewChatScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onSelectContact = { phoneNumber ->
+                        navController.navigate(Routes.buildChatRoute(phoneNumber)) {
+                            popUpTo(Routes.NEW_CHAT) { inclusive = true }
                         }
-                    )
-                }
+                    }
+                )
+            }
 
-                composable(Routes.NEW_CHAT) {
-                    val factory = PulseChatViewModelFactory(context)
-                    val viewModel: NewChatViewModel = viewModel(factory = factory)
-                    NewChatScreen(
-                        viewModel = viewModel,
-                        onNavigateBack = { navController.popBackStack() },
-                        onSelectContact = { phoneNumber ->
-                            navController.navigate(Routes.buildChatRoute(phoneNumber)) {
-                                popUpTo(Routes.NEW_CHAT) { inclusive = true }
-                            }
-                        }
-                    )
-                }
+            composable(
+                route = Routes.CHAT,
+                arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val rawConvId = backStackEntry.arguments?.getString("conversationId") ?: ""
+                val conversationId = Uri.decode(rawConvId)
+                val factory = PulseChatViewModelFactory(context, conversationId)
+                val viewModel: ChatViewModel = viewModel(factory = factory)
+                ChatThreadScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-                composable(
-                    route = Routes.CHAT,
-                    arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
-                    val factory = PulseChatViewModelFactory(context, conversationId)
-                    val viewModel: ChatViewModel = viewModel(factory = factory)
-                    ChatThreadScreen(
-                        viewModel = viewModel,
-                        onNavigateBack = { navController.popBackStack() }
-                    )
-                }
-
-                composable(Routes.PROFILE) {
-                    val factory = PulseChatViewModelFactory(context)
-                    val viewModel: ProfileViewModel = viewModel(factory = factory)
-                    ProfileScreen(
-                        viewModel = viewModel,
-                        onNavigateBack = { navController.popBackStack() }
-                    )
-                }
+            composable(Routes.PROFILE) {
+                val factory = PulseChatViewModelFactory(context)
+                val viewModel: ProfileViewModel = viewModel(factory = factory)
+                ProfileScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     }
 }
+

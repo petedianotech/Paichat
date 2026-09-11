@@ -17,7 +17,9 @@ class SmsStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         val uri = intent.data ?: return
-        val messageId = uri.schemeSpecificPart ?: return
+        val messageId = uri.host?.takeIf { it.isNotBlank() }
+            ?: uri.schemeSpecificPart?.removePrefix("//")?.takeIf { it.isNotBlank() }
+            ?: uri.schemeSpecificPart ?: return
 
         val resultCodeCopy = resultCode
         val pendingResult = goAsync()
@@ -38,8 +40,12 @@ class SmsStatusReceiver : BroadcastReceiver() {
                 } else if (action == "com.example.SMS_DELIVERED") {
                     messageDao.updateMessageStatus(messageId, MessageStatus.DELIVERED)
 
-                    // Delivery Report Notification if enabled
-                    if (prefs.appSettings.value.deliveryReports) {
+                    // Delivery Report Notification if customizable setting is enabled (BOTH or NOTIFICATIONS_ONLY)
+                    val settings = prefs.appSettings.value
+                    val shouldNotify = settings.deliveryReportMode in listOf("BOTH", "NOTIFICATIONS_ONLY") ||
+                            (settings.deliveryReportMode == "DEFAULT" && settings.deliveryReports)
+
+                    if (shouldNotify) {
                         val message = messageDao.getMessageById(messageId)
                         if (message != null) {
                             NotificationHelper.showDeliveryReportNotification(

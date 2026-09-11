@@ -213,7 +213,7 @@ fun ProfileScreen(
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Delivery Reports Toggle
+                        // Delivery Reports Options
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -221,12 +221,43 @@ fun ProfileScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Delivery Reports", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Text("Request delivery confirmation ticks for sent SMS", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Delivery status confirmation options for sent SMS", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Switch(
-                                checked = appSettings.deliveryReports,
-                                onCheckedChange = { viewModel.setDeliveryReports(it) }
+                                checked = appSettings.deliveryReports && appSettings.deliveryReportMode != "OFF",
+                                onCheckedChange = { isChecked ->
+                                    viewModel.setDeliveryReports(isChecked)
+                                }
                             )
+                        }
+
+                        if (appSettings.deliveryReports && appSettings.deliveryReportMode != "OFF") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Choose delivery report confirmation style:",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val modes = listOf(
+                                    "BOTH" to "Both: 2 Marks in Chat & Notification",
+                                    "MARKS_ONLY" to "2 Marks in Chat Only",
+                                    "NOTIFICATIONS_ONLY" to "Notification Alerts Only"
+                                )
+                                modes.forEach { (modeKey, label) ->
+                                    FilterChip(
+                                        selected = appSettings.deliveryReportMode == modeKey,
+                                        onClick = { viewModel.setDeliveryReportMode(modeKey) },
+                                        label = { Text(label, fontSize = 12.sp) },
+                                        leadingIcon = if (appSettings.deliveryReportMode == modeKey) {
+                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                        } else null
+                                    )
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(14.dp))

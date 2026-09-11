@@ -86,6 +86,7 @@ fun MessageBubble(
     reactionEmoji: String?,
     bubbleShape: String = "ROUNDED",
     fontSize: String = "NORMAL",
+    showDeliveryMarks: Boolean = true,
     customColorHex: String? = null,
     onLongClick: () -> Unit,
     onRetryClick: () -> Unit
@@ -363,12 +364,21 @@ fun MessageBubble(
                                 )
                             }
                             MessageStatus.DELIVERED, MessageStatus.READ -> {
-                                Icon(
-                                    imageVector = Icons.Default.DoneAll,
-                                    contentDescription = "Delivered (2 marks)",
-                                    modifier = Modifier.size(14.dp),
-                                    tint = contentColor
-                                )
+                                if (showDeliveryMarks) {
+                                    Icon(
+                                        imageVector = Icons.Default.DoneAll,
+                                        contentDescription = "Delivered (2 marks)",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = contentColor
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Sent",
+                                        modifier = Modifier.size(12.dp),
+                                        tint = contentColor
+                                    )
+                                }
                             }
                             MessageStatus.FAILED -> {
                                 Icon(

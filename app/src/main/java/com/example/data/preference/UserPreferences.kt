@@ -12,6 +12,7 @@ data class AppSettings(
     val colorTheme: String = "BLUE", // BLUE, INDIGO, PURPLE, ROSE, TEAL, AMBER
     val sendDelaySeconds: Int = 3, // 0 (off), 1, 2, 3, 5, 10
     val deliveryReports: Boolean = true,
+    val deliveryReportMode: String = "BOTH", // BOTH, MARKS_ONLY, NOTIFICATIONS_ONLY, OFF
     val signatureText: String = "",
     val bubbleShape: String = "ROUNDED", // ROUNDED, PILL, SQUARE
     val fontSize: String = "NORMAL", // SMALL, NORMAL, LARGE, EXTRA_LARGE
@@ -41,6 +42,7 @@ class UserPreferences(context: Context) {
         val color = prefs.getString("color_theme", "BLUE") ?: "BLUE"
         val delay = prefs.getInt("send_delay_seconds", 3)
         val delivery = prefs.getBoolean("delivery_reports", true)
+        val deliveryMode = prefs.getString("delivery_report_mode", "BOTH") ?: "BOTH"
         val sig = prefs.getString("signature_text", "") ?: ""
         val shape = prefs.getString("bubble_shape", "ROUNDED") ?: "ROUNDED"
         val font = prefs.getString("font_size", "NORMAL") ?: "NORMAL"
@@ -62,6 +64,7 @@ class UserPreferences(context: Context) {
             colorTheme = color,
             sendDelaySeconds = delay,
             deliveryReports = delivery,
+            deliveryReportMode = deliveryMode,
             signatureText = sig,
             bubbleShape = shape,
             fontSize = font,
@@ -99,8 +102,15 @@ class UserPreferences(context: Context) {
     }
 
     fun setDeliveryReports(enabled: Boolean) {
-        prefs.edit().putBoolean("delivery_reports", enabled).apply()
-        _appSettings.value = _appSettings.value.copy(deliveryReports = enabled)
+        val mode = if (enabled) "BOTH" else "OFF"
+        prefs.edit().putBoolean("delivery_reports", enabled).putString("delivery_report_mode", mode).apply()
+        _appSettings.value = _appSettings.value.copy(deliveryReports = enabled, deliveryReportMode = mode)
+    }
+
+    fun setDeliveryReportMode(mode: String) {
+        val isEnabled = mode != "OFF"
+        prefs.edit().putString("delivery_report_mode", mode).putBoolean("delivery_reports", isEnabled).apply()
+        _appSettings.value = _appSettings.value.copy(deliveryReportMode = mode, deliveryReports = isEnabled)
     }
 
     fun setSignatureText(sig: String) {

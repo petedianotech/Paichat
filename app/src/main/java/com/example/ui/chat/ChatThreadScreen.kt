@@ -762,6 +762,7 @@ fun ChatThreadScreen(
                             reactionEmoji = reactions[message.messageId],
                             bubbleShape = appSettings.bubbleShape,
                             fontSize = appSettings.fontSize,
+                            showDeliveryMarks = appSettings.deliveryReportMode in listOf("BOTH", "MARKS_ONLY") || (appSettings.deliveryReportMode == "DEFAULT" && appSettings.deliveryReports),
                             customColorHex = conversation?.customColorHex,
                             onLongClick = { selectedMessageForAction = message },
                             onRetryClick = {

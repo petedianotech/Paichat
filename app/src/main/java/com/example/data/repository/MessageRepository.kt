@@ -26,6 +26,7 @@ import com.example.data.local.entity.ScheduledMessageEntity
 import com.example.data.sync.SmsSyncHelper
 import com.example.receiver.SmsStatusReceiver
 import com.example.ui.util.NotificationHelper
+import com.example.ui.util.PhoneNumberUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -74,7 +75,10 @@ class MessageRepository(
         conversationDao.getConversationById(id)
 
     fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>> =
-        messageDao.getMessagesForConversation(conversationId)
+        messageDao.getMessagesForConversationFlexible(
+            conversationId = conversationId,
+            normalizedId = PhoneNumberUtil.normalize(conversationId)
+        )
 
     fun getScheduledMessagesForConversation(conversationId: String): Flow<List<ScheduledMessageEntity>> =
         scheduledMessageDao.getPendingForConversation(conversationId)

@@ -96,6 +96,10 @@ class ProfileViewModel(
         userPreferences.setDeliveryReports(enabled)
     }
 
+    fun setDeliveryReportMode(mode: String) {
+        userPreferences.setDeliveryReportMode(mode)
+    }
+
     fun setSignatureText(sig: String) {
         userPreferences.setSignatureText(sig)
     }

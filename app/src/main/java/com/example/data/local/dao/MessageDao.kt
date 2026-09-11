@@ -11,6 +11,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MessageDao {
+    @Query("""
+        SELECT * FROM messages 
+        WHERE conversationId = :conversationId 
+           OR conversationId = :normalizedId
+           OR recipientPhoneNumber = :conversationId
+           OR recipientPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :conversationId
+           OR senderPhoneNumber = :normalizedId
+        ORDER BY timestamp ASC
+    """)
+    fun getMessagesForConversationFlexible(conversationId: String, normalizedId: String): Flow<List<MessageEntity>>
+
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
     fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>>
 
