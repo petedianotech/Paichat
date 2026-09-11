@@ -373,6 +373,30 @@ fun ProfileScreen(
                         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
                         Spacer(modifier = Modifier.height(14.dp))
 
+                        Text("Image Compression Quality", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Balance photo clarity and cellular data transmission speed",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("HIGH" to "High (HD)", "MEDIUM" to "Medium (Balanced)", "LOW" to "Low (Fast / Low Data)").forEach { (quality, label) ->
+                                FilterChip(
+                                    selected = appSettings.mmsImageCompressionQuality == quality,
+                                    onClick = { viewModel.setMmsImageCompressionQuality(quality) },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
                         Text("Auto-Download MMS", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(
                             "Automatically retrieve incoming multimedia messages",
@@ -490,6 +514,85 @@ fun ProfileScreen(
                             Switch(
                                 checked = appSettings.quickReplyPopup,
                                 onCheckedChange = { viewModel.setQuickReplyPopup(it) }
+                            )
+                        }
+
+                        if (appSettings.quickReplyPopup) {
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Text("Popup Preview Size", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Customize popup overlay dimensions when replying over other apps",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("COMPACT" to "Compact", "STANDARD" to "Standard", "LARGE" to "Large").forEach { (size, label) ->
+                                    FilterChip(
+                                        selected = appSettings.popupPreviewSize == size,
+                                        onClick = { viewModel.setPopupPreviewSize(size) },
+                                        label = { Text(label, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Appear on Top Permission check
+                            val canOverlay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                                android.provider.Settings.canDrawOverlays(context)
+                            } else true
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Appear on Top Permission", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        if (canOverlay) "Granted — Quick reply pops up seamlessly over other apps"
+                                        else "Permission required to show quick reply preview over active apps",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (canOverlay) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                if (!canOverlay && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = android.content.Intent(
+                                                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                                android.net.Uri.parse("package:${context.packageName}")
+                                            )
+                                            context.startActivity(intent)
+                                        }
+                                    ) {
+                                        Text("Grant", fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Auto-Retry Delayed SMS (>60s)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text("Automatically re-send messages that remain loading for over 60 seconds", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = appSettings.autoRetryAfterTimeout,
+                                onCheckedChange = { viewModel.setAutoRetryAfterTimeout(it) }
                             )
                         }
 

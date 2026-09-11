@@ -219,4 +219,65 @@ object NotificationHelper {
             // Permission not granted
         }
     }
+
+    fun showSendingTimeoutNotification(
+        context: Context,
+        recipientPhone: String,
+        recipientName: String?,
+        messageId: String,
+        content: String,
+        isAutoRetrying: Boolean
+    ) {
+        createNotificationChannel(context)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                return
+            }
+        }
+
+        val displayName = recipientName ?: recipientPhone
+        val notificationId = messageId.hashCode()
+
+        val retryIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_RETRY_SEND
+            putExtra(NotificationActionReceiver.EXTRA_MESSAGE_ID, messageId)
+            putExtra(NotificationActionReceiver.EXTRA_CONVERSATION_ID, recipientPhone)
+        }
+        val retryPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId + 5,
+            retryIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val retryAction = NotificationCompat.Action.Builder(
+            android.R.drawable.ic_menu_rotate,
+            if (isAutoRetrying) "Auto-Retrying 🔄" else "Retry Auto 🔄",
+            retryPendingIntent
+        ).build()
+
+        val statusMsg = if (isAutoRetrying) {
+            "SMS is taking over 60s to send. Auto-retrying send..."
+        } else {
+            "SMS pending over 60s. Tap 'Retry Auto' to send."
+        }
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle("SMS Delivery Pending ($displayName)")
+            .setContentText(statusMsg)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$statusMsg\n\nMessage: $content"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setAutoCancel(true)
+            .addAction(retryAction)
+
+        val notificationManager = NotificationManagerCompat.from(context)
+        try {
+            notificationManager.notify(notificationId, builder.build())
+        } catch (_: SecurityException) {
+            // Permission not granted
+        }
+    }
 }

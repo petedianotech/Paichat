@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.ConversationEntity
+import com.example.data.model.SyncProgress
 import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
@@ -29,6 +30,7 @@ class HomeViewModel(
 ) : ViewModel() {
 
     val appSettings: StateFlow<AppSettings> = userPreferences.appSettings
+    val syncProgress: StateFlow<SyncProgress> = messageRepository.syncProgress
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

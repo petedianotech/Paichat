@@ -11,8 +11,12 @@ import com.example.data.local.entity.ConversationEntity
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
+import com.example.data.model.SyncProgress
 import com.example.data.repository.ContactRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 class SmsSyncHelper(
@@ -21,11 +25,16 @@ class SmsSyncHelper(
     private val messageDao: MessageDao,
     private val contactRepository: ContactRepository
 ) {
+    private val _syncProgress = MutableStateFlow(SyncProgress())
+    val syncProgress: StateFlow<SyncProgress> = _syncProgress.asStateFlow()
+
     suspend fun syncDeviceSms(): Int = withContext(Dispatchers.IO) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+            _syncProgress.value = SyncProgress(isSyncing = false, statusText = "SMS permission not granted")
             return@withContext 0
         }
 
+        _syncProgress.value = SyncProgress(isSyncing = true, current = 0, total = 0, statusText = "Scanning device SMS...")
         var importedCount = 0
         try {
             val projection = arrayOf(
@@ -46,6 +55,14 @@ class SmsSyncHelper(
                 "${Telephony.Sms.DATE} DESC"
             )
 
+            val totalSms = cursor?.count ?: 0
+            _syncProgress.value = SyncProgress(
+                isSyncing = true,
+                current = 0,
+                total = totalSms,
+                statusText = "Found $totalSms messages. Reading..."
+            )
+
             val idIdx = cursor?.getColumnIndex(Telephony.Sms._ID) ?: -1
             val addressIdx = cursor?.getColumnIndex(Telephony.Sms.ADDRESS) ?: -1
             val bodyIdx = cursor?.getColumnIndex(Telephony.Sms.BODY) ?: -1
@@ -64,6 +81,7 @@ class SmsSyncHelper(
             val existingConversations = conversationDao.getAllConversationsDirect().associateBy { it.conversationId }
 
             cursor?.use { c ->
+                var processedCount = 0
                 while (c.moveToNext()) {
                     val smsId = if (idIdx >= 0) c.getLong(idIdx) else continue
                     val address = if (addressIdx >= 0) c.getString(addressIdx) else null
@@ -102,8 +120,24 @@ class SmsSyncHelper(
                         )
                         messagesToInsert.add(msg)
                     }
+                    processedCount++
+                    if (processedCount % 100 == 0 || processedCount == totalSms) {
+                        _syncProgress.value = SyncProgress(
+                            isSyncing = true,
+                            current = processedCount,
+                            total = totalSms,
+                            statusText = "Processed $processedCount of $totalSms SMS messages..."
+                        )
+                    }
                 }
             }
+
+            _syncProgress.value = SyncProgress(
+                isSyncing = true,
+                current = messagesToInsert.size,
+                total = totalSms,
+                statusText = "Organizing ${conversationLatestMap.size} conversation threads..."
+            )
 
             // Build Conversation entities
             val conversationsToInsert = ArrayList<ConversationEntity>()
@@ -144,10 +178,29 @@ class SmsSyncHelper(
                 val chunk = messagesToInsert.subList(i, end)
                 messageDao.insertMessagesIgnore(chunk)
                 importedCount += chunk.size
+                _syncProgress.value = SyncProgress(
+                    isSyncing = true,
+                    current = importedCount,
+                    total = messagesToInsert.size,
+                    statusText = "Saving messages to storage ($importedCount/${messagesToInsert.size})..."
+                )
             }
 
+            _syncProgress.value = SyncProgress(
+                isSyncing = false,
+                current = importedCount,
+                total = importedCount,
+                statusText = "Synced $importedCount messages successfully",
+                isCompleted = true
+            )
         } catch (e: Exception) {
             e.printStackTrace()
+            _syncProgress.value = SyncProgress(
+                isSyncing = false,
+                current = importedCount,
+                total = importedCount,
+                statusText = "Sync finished with issues: ${e.localizedMessage ?: "error"}"
+            )
         }
         importedCount
     }

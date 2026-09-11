@@ -16,6 +16,7 @@ import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
+import com.example.ui.util.ImageCompressorHelper
 import com.example.ui.util.SimManagerHelper
 import com.example.ui.util.VoiceNoteHelper
 import kotlinx.coroutines.Job
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -50,6 +52,21 @@ class ChatViewModel(
 
     private val _messages = MutableStateFlow<List<MessageEntity>>(emptyList())
     val messages: StateFlow<List<MessageEntity>> = _messages.asStateFlow()
+
+    // In-thread deep search
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _isSearchActive = MutableStateFlow(false)
+    val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
+
+    val filteredMessages: StateFlow<List<MessageEntity>> = combine(_messages, _searchQuery) { list, query ->
+        if (query.isBlank()) {
+            list
+        } else {
+            list.filter { it.content.contains(query, ignoreCase = true) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val scheduledMessages: StateFlow<List<ScheduledMessageEntity>> =
         messageRepository.getScheduledMessagesForConversation(conversationId)
@@ -355,10 +372,39 @@ class ChatViewModel(
         VoiceNoteHelper.stopRecording()?.delete()
     }
 
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun toggleSearch(active: Boolean? = null) {
+        val newState = active ?: !_isSearchActive.value
+        _isSearchActive.value = newState
+        if (!newState) {
+            _searchQuery.value = ""
+        }
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
+
     fun sendMediaAttachment(context: Context, uriString: String, caption: String? = null) {
         val text = caption?.trim() ?: _inputText.value.trim()
         val contentToSend = if (text.isNotBlank()) text else "Photo attachment"
         _inputText.value = ""
-        actuallyDispatchMessage(context, contentToSend, uriString)
+
+        viewModelScope.launch {
+            // Compress and optimize image based on user's selected compression quality setting
+            val optimizedUri = if (uriString.endsWith(".m4a") || uriString.contains("voice_")) {
+                uriString
+            } else {
+                ImageCompressorHelper.compressImageForMms(
+                    context = context,
+                    inputUriString = uriString,
+                    qualityMode = appSettings.value.mmsImageCompressionQuality
+                )
+            }
+            actuallyDispatchMessage(context, contentToSend, optimizedUri)
+        }
     }
 }

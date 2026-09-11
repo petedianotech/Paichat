@@ -124,6 +124,10 @@ class ProfileViewModel(
         userPreferences.setMmsSizeLimit(limit)
     }
 
+    fun setMmsImageCompressionQuality(quality: String) {
+        userPreferences.setMmsImageCompressionQuality(quality)
+    }
+
     fun setAutoDownloadMms(mode: String) {
         userPreferences.setAutoDownloadMms(mode)
     }
@@ -142,6 +146,14 @@ class ProfileViewModel(
 
     fun setQuickReplyPopup(enabled: Boolean) {
         userPreferences.setQuickReplyPopup(enabled)
+    }
+
+    fun setPopupPreviewSize(size: String) {
+        userPreferences.setPopupPreviewSize(size)
+    }
+
+    fun setAutoRetryAfterTimeout(enabled: Boolean) {
+        userPreferences.setAutoRetryAfterTimeout(enabled)
     }
 
     fun setRepeatNotificationCount(count: Int) {

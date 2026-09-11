@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -145,6 +146,9 @@ fun ChatThreadScreen(
     val delayedSendState by viewModel.delayedSendState.collectAsState()
     val isRecordingVoice by viewModel.isRecordingVoice.collectAsState()
     val recordingDurationSec by viewModel.recordingDurationSec.collectAsState()
+    val isSearchActive by viewModel.isSearchActive.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val filteredMessages by viewModel.filteredMessages.collectAsState()
 
     var selectedMessageForAction by remember { mutableStateOf<MessageEntity?>(null) }
     var showMessageInfoDialog by remember { mutableStateOf<MessageEntity?>(null) }
@@ -292,6 +296,14 @@ fun ChatThreadScreen(
                         }
                     },
                     actions = {
+                        // In-Thread Deep Search Action
+                        IconButton(onClick = { viewModel.toggleSearch() }) {
+                            Icon(
+                                imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                                contentDescription = if (isSearchActive) "Close Search" else "Search Messages in Thread"
+                            )
+                        }
+
                         // Quick Call Action
                         val phone = conversation?.phoneNumber
                         if (!phone.isNullOrBlank()) {
@@ -658,6 +670,74 @@ fun ChatThreadScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
                 ) {
+                    // Deep Thread Search Input Banner
+                    if (isSearchActive) {
+                        item {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    BasicTextField(
+                                        value = searchQuery,
+                                        onValueChange = { viewModel.setSearchQuery(it) },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                        decorationBox = { innerTextField ->
+                                            if (searchQuery.isEmpty()) {
+                                                Text(
+                                                    text = "Search in thread...",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                    if (searchQuery.isNotEmpty()) {
+                                        Text(
+                                            text = "${filteredMessages.size} match${if (filteredMessages.size != 1) "es" else ""}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 6.dp)
+                                        )
+                                        IconButton(
+                                            onClick = { viewModel.clearSearch() },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Clear search text",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Pending Scheduled Messages Banner in Thread
                     if (scheduledMessages.isNotEmpty()) {
                         item {
@@ -747,12 +827,12 @@ fun ChatThreadScreen(
 
                     // Conversation Messages List
                     itemsIndexed(
-                        items = messages,
+                        items = filteredMessages,
                         key = { _, msg -> msg.messageId }
                     ) { index, message ->
                         val isFromMe = message.senderPhoneNumber == "ME"
-                        val isFirstInGroup = index == 0 || messages[index - 1].senderPhoneNumber != message.senderPhoneNumber
-                        val isLastInGroup = index == messages.size - 1 || messages[index + 1].senderPhoneNumber != message.senderPhoneNumber
+                        val isFirstInGroup = index == 0 || filteredMessages[index - 1].senderPhoneNumber != message.senderPhoneNumber
+                        val isLastInGroup = index == filteredMessages.size - 1 || filteredMessages[index + 1].senderPhoneNumber != message.senderPhoneNumber
 
                         MessageBubble(
                             message = message,
@@ -764,6 +844,7 @@ fun ChatThreadScreen(
                             fontSize = appSettings.fontSize,
                             showDeliveryMarks = appSettings.deliveryReportMode in listOf("BOTH", "MARKS_ONLY") || (appSettings.deliveryReportMode == "DEFAULT" && appSettings.deliveryReports),
                             customColorHex = conversation?.customColorHex,
+                            highlightQuery = searchQuery,
                             onLongClick = { selectedMessageForAction = message },
                             onRetryClick = {
                                 executeWithSmsPermission {

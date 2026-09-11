@@ -43,12 +43,14 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -84,6 +86,7 @@ fun HomeScreen(
     val conversations by viewModel.conversations.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val currentFilter by viewModel.currentFilter.collectAsState()
+    val syncProgress by viewModel.syncProgress.collectAsState()
 
     var isSearchActive by remember { mutableStateOf(false) }
     var selectedConversationForMenu by remember { mutableStateOf<ConversationEntity?>(null) }
@@ -191,6 +194,62 @@ fun HomeScreen(
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         )
+                    }
+
+                    // Visual Progress Bar & Status Indicator during SMS Syncing / Importing
+                    if (syncProgress.isSyncing) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            tonalElevation = 2.dp
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = syncProgress.statusText.ifEmpty { "Syncing messages..." },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (syncProgress.total > 0) {
+                                        Text(
+                                            text = "${(syncProgress.progress * 100).toInt()}%",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                if (syncProgress.total > 0) {
+                                    LinearProgressIndicator(
+                                        progress = { syncProgress.progress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                } else {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             },

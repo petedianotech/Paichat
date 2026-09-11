@@ -57,7 +57,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -88,6 +93,7 @@ fun MessageBubble(
     fontSize: String = "NORMAL",
     showDeliveryMarks: Boolean = true,
     customColorHex: String? = null,
+    highlightQuery: String = "",
     onLongClick: () -> Unit,
     onRetryClick: () -> Unit
 ) {
@@ -161,6 +167,16 @@ fun MessageBubble(
     val isPhotoMms = !message.mediaUrl.isNullOrBlank() && !isVoiceNote
     val isMms = message.messageType == MessageType.MMS || !message.mediaUrl.isNullOrBlank()
 
+    val senderLabel = if (isFromMe) "You" else "Contact"
+    val statusLabel = when (message.status) {
+        MessageStatus.DELIVERED -> "Delivered"
+        MessageStatus.SENT -> "Sent"
+        MessageStatus.SENDING -> "Sending"
+        MessageStatus.FAILED -> "Failed to send"
+        MessageStatus.READ -> "Read"
+    }
+    val accessibilityDescription = "$senderLabel at ${TimeFormatter.formatMessageTimestamp(message.timestamp)}: ${message.content}. Status: $statusLabel. Double tap and hold for options."
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -173,6 +189,9 @@ fun MessageBubble(
             contentColor = contentColor,
             modifier = Modifier
                 .widthIn(max = 300.dp)
+                .semantics {
+                    contentDescription = accessibilityDescription
+                }
                 .combinedClickable(
                     onClick = {},
                     onLongClick = onLongClick
@@ -306,14 +325,50 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // 3. Text Content with Partial Selection Container
+                // 3. Text Content with Partial Selection Container and Search Highlighting
                 if (message.content.isNotBlank() && (!isPhotoMms || message.content != "Photo attachment") && (!isVoiceNote || message.content != "Voice message")) {
                     SelectionContainer {
-                        Text(
-                            text = message.content,
-                            style = textStyle,
-                            color = contentColor
-                        )
+                        if (highlightQuery.isNotBlank() && message.content.contains(highlightQuery, ignoreCase = true)) {
+                            val annotatedString = buildAnnotatedString {
+                                val text = message.content
+                                var startIndex = 0
+                                val queryLower = highlightQuery.lowercase()
+                                val textLower = text.lowercase()
+
+                                while (startIndex < text.length) {
+                                    val index = textLower.indexOf(queryLower, startIndex)
+                                    if (index == -1) {
+                                        append(text.substring(startIndex))
+                                        break
+                                    }
+                                    if (index > startIndex) {
+                                        append(text.substring(startIndex, index))
+                                    }
+                                    val matchEnd = index + highlightQuery.length
+                                    withStyle(
+                                        style = SpanStyle(
+                                            background = Color(0xFFFFD54F),
+                                            color = Color.Black,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    ) {
+                                        append(text.substring(index, matchEnd))
+                                    }
+                                    startIndex = matchEnd
+                                }
+                            }
+                            Text(
+                                text = annotatedString,
+                                style = textStyle,
+                                color = contentColor
+                            )
+                        } else {
+                            Text(
+                                text = message.content,
+                                style = textStyle,
+                                color = contentColor
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                 }

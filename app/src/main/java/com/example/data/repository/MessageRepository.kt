@@ -23,6 +23,7 @@ import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
 import com.example.data.local.entity.QuickResponseEntity
 import com.example.data.local.entity.ScheduledMessageEntity
+import com.example.data.model.SyncProgress
 import com.example.data.sync.SmsSyncHelper
 import com.example.receiver.SmsStatusReceiver
 import com.example.ui.util.NotificationHelper
@@ -30,6 +31,7 @@ import com.example.ui.util.PhoneNumberUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -44,6 +46,8 @@ class MessageRepository(
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     private val smsSyncHelper = SmsSyncHelper(context, conversationDao, messageDao, contactRepository)
+
+    val syncProgress: StateFlow<SyncProgress> = smsSyncHelper.syncProgress
 
     init {
         scope.launch {
@@ -238,7 +242,50 @@ class MessageRepository(
             sendSmsMessageProcess(messageId, recipientPhone, content, subscriptionId)
         }
 
+        // 4. Start 60-second timeout watcher for quick reply & standard SMS
+        startMessageTimeoutWatcher(messageId, recipientPhone, recipientName, content)
+
         return message
+    }
+
+    private fun startMessageTimeoutWatcher(
+        messageId: String,
+        recipientPhone: String,
+        recipientName: String?,
+        content: String
+    ) {
+        scope.launch {
+            kotlinx.coroutines.delay(60_000L) // 60 seconds threshold
+            val currentMsg = messageDao.getMessageById(messageId)
+            if (currentMsg != null && (currentMsg.status == MessageStatus.SENDING || currentMsg.status == MessageStatus.FAILED)) {
+                val userPrefs = com.example.data.preference.UserPreferences(context)
+                val appSettings = userPrefs.appSettings.value
+
+                if (appSettings.autoRetryAfterTimeout) {
+                    messageDao.updateMessageStatus(messageId, MessageStatus.SENDING)
+                    sendSmsMessageProcess(messageId, recipientPhone, content, null)
+
+                    NotificationHelper.showSendingTimeoutNotification(
+                        context = context,
+                        recipientPhone = recipientPhone,
+                        recipientName = recipientName,
+                        messageId = messageId,
+                        content = content,
+                        isAutoRetrying = true
+                    )
+                } else {
+                    messageDao.updateMessageStatus(messageId, MessageStatus.FAILED)
+                    NotificationHelper.showSendingTimeoutNotification(
+                        context = context,
+                        recipientPhone = recipientPhone,
+                        recipientName = recipientName,
+                        messageId = messageId,
+                        content = content,
+                        isAutoRetrying = false
+                    )
+                }
+            }
+        }
     }
 
     suspend fun sendBroadcastOrGroupSms(
@@ -268,6 +315,8 @@ class MessageRepository(
         scope.launch {
             sendSmsMessageProcess(messageId, message.recipientPhoneNumber, message.content, null)
         }
+
+        startMessageTimeoutWatcher(messageId, message.recipientPhoneNumber, null, message.content)
     }
 
     private suspend fun sendSmsMessageProcess(

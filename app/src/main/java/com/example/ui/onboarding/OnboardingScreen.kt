@@ -30,6 +30,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -58,6 +59,7 @@ fun OnboardingScreen(
     val context = LocalContext.current
     val isDefaultSms by viewModel.isDefaultSmsApp.collectAsState()
     val hasPermissions by viewModel.hasPermissions.collectAsState()
+    val syncProgress by viewModel.syncProgress.collectAsState()
 
     val defaultSmsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -282,10 +284,65 @@ fun OnboardingScreen(
                     }
                 }
 
+                if (syncProgress.isSyncing) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = syncProgress.statusText.ifEmpty { "Syncing SMS messages..." },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                if (syncProgress.total > 0) {
+                                    Text(
+                                        text = "${(syncProgress.progress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            if (syncProgress.total > 0) {
+                                LinearProgressIndicator(
+                                    progress = { syncProgress.progress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp)),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp)),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 32.dp, bottom = 12.dp)
+                        .padding(top = 24.dp, bottom = 12.dp)
                 ) {
                     Button(
                         onClick = {

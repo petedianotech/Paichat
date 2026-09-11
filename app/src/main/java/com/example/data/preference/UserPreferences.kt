@@ -21,12 +21,15 @@ data class AppSettings(
     val selectedSimSlot: Int = 0, // 0 = SIM 1, 1 = SIM 2
     // Textra-grade MMS & Media settings
     val mmsSizeLimit: String = "1MB", // 300KB, 600KB, 1MB, 2MB
+    val mmsImageCompressionQuality: String = "HIGH", // HIGH, MEDIUM, LOW
     val autoDownloadMms: String = "ALWAYS", // ALWAYS, WIFI_ONLY, NEVER
     val autoSavePhotos: Boolean = false,
     // Notification & Quick Reply settings
     val notificationSound: Boolean = true,
     val notificationVibratePattern: String = "NORMAL", // NORMAL, SHORT, LONG, OFF
     val quickReplyPopup: Boolean = true,
+    val popupPreviewSize: String = "STANDARD", // COMPACT, STANDARD, LARGE
+    val autoRetryAfterTimeout: Boolean = true, // Auto retry sending if pending > 60s
     val repeatNotificationCount: Int = 0 // 0 = Never, 1, 2, 5
 )
 
@@ -51,11 +54,14 @@ class UserPreferences(context: Context) {
         val simSlot = prefs.getInt("selected_sim_slot", 0)
 
         val mmsSize = prefs.getString("mms_size_limit", "1MB") ?: "1MB"
+        val mmsQuality = prefs.getString("mms_image_compression_quality", "HIGH") ?: "HIGH"
         val autoMms = prefs.getString("auto_download_mms", "ALWAYS") ?: "ALWAYS"
         val autoSave = prefs.getBoolean("auto_save_photos", false)
         val notifSound = prefs.getBoolean("notification_sound", true)
         val notifVib = prefs.getString("notification_vibrate_pattern", "NORMAL") ?: "NORMAL"
         val quickReply = prefs.getBoolean("quick_reply_popup", true)
+        val popupSize = prefs.getString("popup_preview_size", "STANDARD") ?: "STANDARD"
+        val autoRetry = prefs.getBoolean("auto_retry_after_timeout", true)
         val repeatNotif = prefs.getInt("repeat_notification_count", 0)
 
         return AppSettings(
@@ -72,11 +78,14 @@ class UserPreferences(context: Context) {
             showCharacterCounter = charCounter,
             selectedSimSlot = simSlot,
             mmsSizeLimit = mmsSize,
+            mmsImageCompressionQuality = mmsQuality,
             autoDownloadMms = autoMms,
             autoSavePhotos = autoSave,
             notificationSound = notifSound,
             notificationVibratePattern = notifVib,
             quickReplyPopup = quickReply,
+            popupPreviewSize = popupSize,
+            autoRetryAfterTimeout = autoRetry,
             repeatNotificationCount = repeatNotif
         )
     }
@@ -148,6 +157,11 @@ class UserPreferences(context: Context) {
         _appSettings.value = _appSettings.value.copy(mmsSizeLimit = limit)
     }
 
+    fun setMmsImageCompressionQuality(quality: String) {
+        prefs.edit().putString("mms_image_compression_quality", quality).apply()
+        _appSettings.value = _appSettings.value.copy(mmsImageCompressionQuality = quality)
+    }
+
     fun setAutoDownloadMms(mode: String) {
         prefs.edit().putString("auto_download_mms", mode).apply()
         _appSettings.value = _appSettings.value.copy(autoDownloadMms = mode)
@@ -171,6 +185,16 @@ class UserPreferences(context: Context) {
     fun setQuickReplyPopup(enabled: Boolean) {
         prefs.edit().putBoolean("quick_reply_popup", enabled).apply()
         _appSettings.value = _appSettings.value.copy(quickReplyPopup = enabled)
+    }
+
+    fun setPopupPreviewSize(size: String) {
+        prefs.edit().putString("popup_preview_size", size).apply()
+        _appSettings.value = _appSettings.value.copy(popupPreviewSize = size)
+    }
+
+    fun setAutoRetryAfterTimeout(enabled: Boolean) {
+        prefs.edit().putBoolean("auto_retry_after_timeout", enabled).apply()
+        _appSettings.value = _appSettings.value.copy(autoRetryAfterTimeout = enabled)
     }
 
     fun setRepeatNotificationCount(count: Int) {

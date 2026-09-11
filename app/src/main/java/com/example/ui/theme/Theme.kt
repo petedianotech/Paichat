@@ -1,14 +1,18 @@
 package com.example.ui.theme
 
+import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 val LocalThemeGradient = staticCompositionLocalOf<Brush> {
     Brush.verticalGradient(colors = listOf(Color(0xFFF8F9FF), Color(0xFFF8F9FF)))
@@ -135,6 +139,18 @@ fun PaiChatTheme(
                        else Brush.verticalGradient(colors = listOf(Color(0xFFFFF8EC), Color(0xFFFFFCF5)))
             else -> if (isDark) Brush.verticalGradient(colors = listOf(Color(0xFF081225), Color(0xFF040810)))
                     else Brush.verticalGradient(colors = listOf(Color(0xFFF0F5FF), Color(0xFFFAFCFF)))
+        }
+    }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                insetsController.isAppearanceLightStatusBars = !isDark
+                insetsController.isAppearanceLightNavigationBars = !isDark
+            }
         }
     }
 

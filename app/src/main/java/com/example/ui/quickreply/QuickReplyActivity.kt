@@ -1,6 +1,11 @@
 package com.example.ui.quickreply
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,8 +16,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,11 +35,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -42,6 +53,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -62,7 +74,7 @@ import androidx.compose.ui.unit.sp
 import com.example.MainActivity
 import com.example.data.local.database.PulseChatDatabase
 import com.example.data.local.entity.MessageEntity
-import com.example.data.local.entity.MessageType
+import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
 import com.example.ui.theme.PaiChatTheme
@@ -74,6 +86,17 @@ class QuickReplyActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+
         val conversationId = intent.getStringExtra("conversationId") ?: intent.getStringExtra("senderPhone") ?: ""
         val senderPhone = intent.getStringExtra("senderPhone") ?: conversationId
         val senderName = intent.getStringExtra("senderName")
@@ -83,6 +106,8 @@ class QuickReplyActivity : ComponentActivity() {
             finish()
             return
         }
+
+        val userPreferences = UserPreferences(applicationContext)
 
         // Initialize dependencies
         val database = PulseChatDatabase.getDatabase(applicationContext)
@@ -98,17 +123,23 @@ class QuickReplyActivity : ComponentActivity() {
         )
 
         setContent {
-            PaiChatTheme {
+            val appSettings by userPreferences.appSettings.collectAsState()
+
+            PaiChatTheme(
+                themeMode = appSettings.themeMode,
+                colorTheme = appSettings.colorTheme
+            ) {
                 QuickReplyPopupScreen(
                     conversationId = conversationId,
                     senderPhone = senderPhone,
                     senderName = senderName,
                     initialMessage = initialMessage,
                     messageRepository = messageRepository,
+                    userPreferences = userPreferences,
                     onDismiss = { finish() },
                     onOpenFullChat = {
-                        val openIntent = android.content.Intent(this, MainActivity::class.java).apply {
-                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        val openIntent = Intent(this, MainActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                             putExtra("conversationId", conversationId)
                         }
                         startActivity(openIntent)
@@ -127,6 +158,7 @@ fun QuickReplyPopupScreen(
     senderName: String?,
     initialMessage: String,
     messageRepository: MessageRepository,
+    userPreferences: UserPreferences,
     onDismiss: () -> Unit,
     onOpenFullChat: () -> Unit
 ) {
@@ -134,7 +166,9 @@ fun QuickReplyPopupScreen(
     val scope = rememberCoroutineScope()
     var replyText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
+    var showSizeMenu by remember { mutableStateOf(false) }
 
+    val appSettings by userPreferences.appSettings.collectAsState()
     val messages by messageRepository.getMessagesForConversation(conversationId)
         .collectAsState(initial = emptyList())
 
@@ -142,6 +176,20 @@ fun QuickReplyPopupScreen(
         .collectAsState(initial = emptyList())
 
     val listState = rememberLazyListState()
+
+    // Dynamic Preview Sizing based on user preference
+    val (widthFraction, heightFraction) = when (appSettings.popupPreviewSize) {
+        "COMPACT" -> Pair(0.86f, 0.54f)
+        "LARGE" -> Pair(0.98f, 0.88f)
+        else -> Pair(0.92f, 0.72f) // STANDARD
+    }
+
+    // Check system overlay permission ("Appear on top of other apps")
+    val canDrawOverlays = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        Settings.canDrawOverlays(context)
+    } else {
+        true
+    }
 
     // Scroll to latest message when messages load
     val imeBottom = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)
@@ -163,14 +211,14 @@ fun QuickReplyPopupScreen(
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
-            .background(Color.Black.copy(alpha = 0.65f))
+            .background(Color.Black.copy(alpha = 0.60f))
             .clickable { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.78f)
+                .fillMaxWidth(widthFraction)
+                .fillMaxHeight(heightFraction)
                 .clickable(enabled = false) {}
                 .testTag("quick_reply_popup_card"),
             shape = RoundedCornerShape(24.dp),
@@ -184,7 +232,7 @@ fun QuickReplyPopupScreen(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
-                // 1. Popup Top Header Bar
+                // 1. Popup Top Header Bar with Size Switcher
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -196,7 +244,7 @@ fun QuickReplyPopupScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
@@ -226,7 +274,44 @@ fun QuickReplyPopupScreen(
                         }
                     }
 
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Size Selection Dropdown Button
+                        Box {
+                            IconButton(onClick = { showSizeMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.AspectRatio,
+                                    contentDescription = "Change Preview Size",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showSizeMenu,
+                                onDismissRequest = { showSizeMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Compact Preview") },
+                                    onClick = {
+                                        userPreferences.setPopupPreviewSize("COMPACT")
+                                        showSizeMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Standard Preview") },
+                                    onClick = {
+                                        userPreferences.setPopupPreviewSize("STANDARD")
+                                        showSizeMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Large Preview") },
+                                    onClick = {
+                                        userPreferences.setPopupPreviewSize("LARGE")
+                                        showSizeMenu = false
+                                    }
+                                )
+                            }
+                        }
+
                         IconButton(onClick = onOpenFullChat) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,
@@ -245,6 +330,55 @@ fun QuickReplyPopupScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Overlay Permission Banner if not granted
+                if (!canDrawOverlays && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Layers,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Enable 'Appear on top' to reply over other apps",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    val intent = Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                    context.startActivity(intent)
+                                }
+                            ) {
+                                Text("Grant", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

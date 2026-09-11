@@ -9,6 +9,7 @@ import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.model.SyncProgress
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
@@ -22,6 +23,8 @@ class OnboardingViewModel(
     private val messageRepository: MessageRepository,
     private val contactRepository: ContactRepository
 ) : ViewModel() {
+
+    val syncProgress: StateFlow<SyncProgress> = messageRepository.syncProgress
 
     private val _isDefaultSmsApp = MutableStateFlow(false)
     val isDefaultSmsApp: StateFlow<Boolean> = _isDefaultSmsApp.asStateFlow()
