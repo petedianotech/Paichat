@@ -53,6 +53,9 @@ class ChatViewModel(
     private val _messages = MutableStateFlow<List<MessageEntity>>(emptyList())
     val messages: StateFlow<List<MessageEntity>> = _messages.asStateFlow()
 
+    private val _messageLimit = MutableStateFlow(50)
+    val messageLimit: StateFlow<Int> = _messageLimit.asStateFlow()
+
     // In-thread deep search
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -110,14 +113,22 @@ class ChatViewModel(
         }
 
         viewModelScope.launch {
-            messageRepository.getMessagesForConversation(conversationId).collectLatest {
-                _messages.value = it
+            _messageLimit.collectLatest { limit ->
+                messageRepository.getMessagesForConversationPaged(conversationId, limit).collect { list ->
+                    _messages.value = list
+                }
             }
         }
 
         // Check if any due scheduled messages exist
         viewModelScope.launch {
             messageRepository.checkAndDispatchDueScheduledMessages()
+        }
+    }
+
+    fun loadMoreMessages() {
+        if (_messages.value.size >= _messageLimit.value) {
+            _messageLimit.value += 50
         }
     }
 

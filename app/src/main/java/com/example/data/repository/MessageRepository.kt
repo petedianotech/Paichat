@@ -32,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -84,6 +85,13 @@ class MessageRepository(
             conversationId = conversationId,
             normalizedId = PhoneNumberUtil.normalize(conversationId)
         )
+
+    fun getMessagesForConversationPaged(conversationId: String, limit: Int): Flow<List<MessageEntity>> =
+        messageDao.getMessagesForConversationFlexiblePaged(
+            conversationId = conversationId,
+            normalizedId = PhoneNumberUtil.normalize(conversationId),
+            limit = limit
+        ).map { list -> list.reversed() }
 
     fun getScheduledMessagesForConversation(conversationId: String): Flow<List<ScheduledMessageEntity>> =
         scheduledMessageDao.getPendingForConversation(conversationId)

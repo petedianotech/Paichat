@@ -171,7 +171,7 @@ fun QuickReplyPopupScreen(
     var showSizeMenu by remember { mutableStateOf(false) }
 
     val appSettings by userPreferences.appSettings.collectAsState()
-    val messages by messageRepository.getMessagesForConversation(conversationId)
+    val messages by messageRepository.getMessagesForConversationPaged(conversationId, 30)
         .collectAsState(initial = emptyList())
 
     val quickResponses by messageRepository.getAllQuickResponses()

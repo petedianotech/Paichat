@@ -101,11 +101,14 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -169,6 +172,12 @@ fun ChatThreadScreen(
     var pendingActionAfterPermission by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val listState = rememberLazyListState()
+
+    // Paging and Scroll Position Preservation State
+    var isInitialLoad by remember { mutableStateOf(true) }
+    var firstVisibleItemKey by remember { mutableStateOf<Any?>(null) }
+    var firstVisibleItemOffset by remember { mutableStateOf(0) }
+
     val emojiList = listOf("❤️", "👍", "😂", "😮", "😢", "🔥")
 
     // Zero-permission Android Photo Picker for MMS
@@ -217,6 +226,31 @@ fun ChatThreadScreen(
         viewModel.loadSims(context)
     }
 
+    // Connect snapshotFlow to track scroll position and detect near-top for loading older messages
+    LaunchedEffect(listState) {
+        // Collect first visible item info for scroll preservation
+        launch {
+            snapshotFlow {
+                val layoutInfo = listState.layoutInfo
+                val firstVisibleItem = layoutInfo.visibleItemsInfo.firstOrNull()
+                Pair(firstVisibleItem?.key, firstVisibleItem?.offset ?: 0)
+            }.collectLatest { (key, offset) ->
+                firstVisibleItemKey = key
+                firstVisibleItemOffset = offset
+            }
+        }
+        
+        // Detect near-top scroll to trigger pagination
+        launch {
+            snapshotFlow { listState.firstVisibleItemIndex }
+                .collectLatest { firstVisibleIndex ->
+                    if (firstVisibleIndex <= 5 && messages.isNotEmpty() && !isInitialLoad) {
+                        viewModel.loadMoreMessages()
+                    }
+                }
+        }
+    }
+
     val imeBottom = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)
     LaunchedEffect(imeBottom) {
         if (imeBottom > 0 && messages.isNotEmpty()) {
@@ -224,9 +258,45 @@ fun ChatThreadScreen(
         }
     }
 
-    LaunchedEffect(messages.size) {
+    val isAtBottom = remember(listState) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) {
+                true
+            } else {
+                val lastVisibleItem = visibleItems.last()
+                lastVisibleItem.index >= layoutInfo.totalItemsCount - 2
+            }
+        }
+    }
+
+    var lastMessageCount by remember { mutableStateOf(0) }
+    var lastMessageId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(messages) {
         if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+            val newLastMessage = messages.last()
+            val isNewMessageAdded = lastMessageId != null && newLastMessage.messageId != lastMessageId
+            val isFromMe = newLastMessage.senderPhoneNumber == "ME"
+
+            if (isInitialLoad) {
+                listState.scrollToItem(messages.size - 1)
+                isInitialLoad = false
+            } else if (isNewMessageAdded && (isFromMe || isAtBottom.value)) {
+                listState.animateScrollToItem(messages.size - 1)
+            } else if (messages.size > lastMessageCount) {
+                // Restore scroll position when older messages are prepended
+                val oldKey = firstVisibleItemKey
+                if (oldKey != null) {
+                    val index = messages.indexOfFirst { it.messageId == oldKey }
+                    if (index != -1) {
+                        listState.scrollToItem(index, firstVisibleItemOffset)
+                    }
+                }
+            }
+            lastMessageId = newLastMessage.messageId
+            lastMessageCount = messages.size
         }
     }
 
