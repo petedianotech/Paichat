@@ -31,6 +31,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
         val db = PulseChatDatabase.getDatabase(context)
         val contactRepo = ContactRepository()
+        val prefs = com.example.data.preference.UserPreferences(context)
         val messageRepo = MessageRepository(
             context,
             db.conversationDao(),
@@ -38,7 +39,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
             db.scheduledMessageDao(),
             db.blockedContactDao(),
             db.quickResponseDao(),
-            contactRepo
+            contactRepo,
+            prefs
         )
 
         val notificationManager = NotificationManagerCompat.from(context)

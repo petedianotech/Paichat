@@ -1,7 +1,9 @@
 package com.example.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -50,50 +53,69 @@ fun ConversationItem(
     }
     val avatarColor = customColor ?: AvatarUtil.getAvatarColor(conversation.phoneNumber)
     val initials = AvatarUtil.getInitials(contactName)
+    val isUnread = conversation.unreadCount > 0
+
+    val cardShape = RoundedCornerShape(18.dp)
+    val containerColor = when {
+        conversation.isPinned -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+        isUnread -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+    }
+
+    val borderStroke = if (conversation.isPinned) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+    } else if (isUnread) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+    } else null
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp)
+            .padding(horizontal = 14.dp, vertical = 3.5.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             )
             .testTag("conversation_item_${conversation.conversationId}"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (conversation.isPinned) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-            } else {
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
-            }
-        )
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isUnread || conversation.isPinned) 1.5.dp else 0.5.dp),
+        border = borderStroke
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Contact Initials Avatar
+            // Enhanced Avatar with Vibrant Radial/Gradient Depth
             Box(
                 modifier = Modifier
-                    .size(50.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
-                    .background(avatarColor),
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                avatarColor.copy(alpha = 0.95f),
+                                avatarColor.copy(alpha = 0.75f)
+                            )
+                        )
+                    )
+                    .border(1.5.dp, Color.White.copy(alpha = 0.25f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = initials,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
                 )
             }
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // Main Details
+            // Main Message Details
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically
@@ -101,7 +123,8 @@ fun ConversationItem(
                     Text(
                         text = contactName,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.SemiBold,
+                        fontWeight = if (isUnread) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
@@ -112,7 +135,7 @@ fun ConversationItem(
                         Icon(
                             imageVector = Icons.Default.PushPin,
                             contentDescription = "Pinned",
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(15.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -121,8 +144,9 @@ fun ConversationItem(
 
                     Text(
                         text = TimeFormatter.formatMessageTimestamp(conversation.lastMessageTimestamp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (conversation.unreadCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isUnread) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -133,35 +157,38 @@ fun ConversationItem(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f),
+                        color = if (isUnread) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Text(
                             text = "SMS",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = if (isUnread) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
 
                     Text(
-                        text = conversation.lastMessage,
+                        text = conversation.lastMessage.ifBlank { "Conversation started" },
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (conversation.unreadCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isUnread) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
 
-                    if (conversation.unreadCount > 0) {
+                    if (isUnread) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Badge(
                             containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(2.dp)
                         ) {
                             Text(
                                 text = conversation.unreadCount.toString(),
-                                style = MaterialTheme.typography.labelSmall
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }

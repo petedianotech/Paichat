@@ -30,64 +30,107 @@ data class AppSettings(
     val quickReplyPopup: Boolean = true,
     val popupPreviewSize: String = "STANDARD", // COMPACT, STANDARD, LARGE
     val autoRetryAfterTimeout: Boolean = true, // Auto retry sending if pending > 60s
-    val repeatNotificationCount: Int = 0 // 0 = Never, 1, 2, 5
+    val repeatNotificationCount: Int = 0, // 0 = Never, 1, 2, 5
+    // User Profile & Customization
+    val userName: String = "You",
+    val userPhoneNumber: String = "",
+    val userAvatarColor: String = "#005AC1",
+    val userStatus: String = "SMS Messenger • Fast & Secure",
+    val lastSmsSyncTimestamp: Long = 0L
 )
 
 class UserPreferences(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("sms_app_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.applicationContext.getSharedPreferences("sms_app_prefs", Context.MODE_PRIVATE)
 
-    private val _appSettings = MutableStateFlow(loadSettings())
+    companion object {
+        @Volatile
+        private var sharedSettingsFlow: MutableStateFlow<AppSettings>? = null
+        private var preferenceListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+        private fun getOrCreateFlow(prefs: SharedPreferences): MutableStateFlow<AppSettings> {
+            return sharedSettingsFlow ?: synchronized(this) {
+                sharedSettingsFlow ?: run {
+                    val initial = loadSettings(prefs)
+                    val flow = MutableStateFlow(initial)
+                    sharedSettingsFlow = flow
+                    
+                    val listener = SharedPreferences.OnSharedPreferenceChangeListener { sp, _ ->
+                        flow.value = loadSettings(sp)
+                    }
+                    preferenceListener = listener
+                    prefs.registerOnSharedPreferenceChangeListener(listener)
+                    flow
+                }
+            }
+        }
+
+        private fun loadSettings(prefs: SharedPreferences): AppSettings {
+            val onboarded = prefs.getBoolean("is_onboarded", false)
+            val theme = prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
+            val color = prefs.getString("color_theme", "BLUE") ?: "BLUE"
+            val delay = prefs.getInt("send_delay_seconds", 3)
+            val delivery = prefs.getBoolean("delivery_reports", true)
+            val deliveryMode = prefs.getString("delivery_report_mode", "BOTH") ?: "BOTH"
+            val sig = prefs.getString("signature_text", "") ?: ""
+            val shape = prefs.getString("bubble_shape", "ROUNDED") ?: "ROUNDED"
+            val font = prefs.getString("font_size", "NORMAL") ?: "NORMAL"
+            val vibrate = prefs.getBoolean("vibrate_on_send", true)
+            val charCounter = prefs.getBoolean("show_char_counter", true)
+            val simSlot = prefs.getInt("selected_sim_slot", 0)
+
+            val mmsSize = prefs.getString("mms_size_limit", "1MB") ?: "1MB"
+            val mmsQuality = prefs.getString("mms_image_compression_quality", "HIGH") ?: "HIGH"
+            val autoMms = prefs.getString("auto_download_mms", "ALWAYS") ?: "ALWAYS"
+            val autoSave = prefs.getBoolean("auto_save_photos", false)
+            val notifSound = prefs.getBoolean("notification_sound", true)
+            val notifVib = prefs.getString("notification_vibrate_pattern", "NORMAL") ?: "NORMAL"
+            val quickReply = prefs.getBoolean("quick_reply_popup", true)
+            val popupSize = prefs.getString("popup_preview_size", "STANDARD") ?: "STANDARD"
+            val autoRetry = prefs.getBoolean("auto_retry_after_timeout", true)
+            val repeatNotif = prefs.getInt("repeat_notification_count", 0)
+            val uName = prefs.getString("user_name", "You") ?: "You"
+            val uPhone = prefs.getString("user_phone_number", "") ?: ""
+            val uAvatarColor = prefs.getString("user_avatar_color", "#005AC1") ?: "#005AC1"
+            val uStatus = prefs.getString("user_status", "SMS Messenger • Fast & Secure") ?: "SMS Messenger • Fast & Secure"
+            val lastSync = prefs.getLong("last_sms_sync_timestamp", 0L)
+
+            return AppSettings(
+                isOnboarded = onboarded,
+                themeMode = theme,
+                colorTheme = color,
+                sendDelaySeconds = delay,
+                deliveryReports = delivery,
+                deliveryReportMode = deliveryMode,
+                signatureText = sig,
+                bubbleShape = shape,
+                fontSize = font,
+                vibrateOnSend = vibrate,
+                showCharacterCounter = charCounter,
+                selectedSimSlot = simSlot,
+                mmsSizeLimit = mmsSize,
+                mmsImageCompressionQuality = mmsQuality,
+                autoDownloadMms = autoMms,
+                autoSavePhotos = autoSave,
+                notificationSound = notifSound,
+                notificationVibratePattern = notifVib,
+                quickReplyPopup = quickReply,
+                popupPreviewSize = popupSize,
+                autoRetryAfterTimeout = autoRetry,
+                repeatNotificationCount = repeatNotif,
+                userName = uName,
+                userPhoneNumber = uPhone,
+                userAvatarColor = uAvatarColor,
+                userStatus = uStatus,
+                lastSmsSyncTimestamp = lastSync
+            )
+        }
+    }
+
+    private val _appSettings: MutableStateFlow<AppSettings> = getOrCreateFlow(prefs)
     val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
 
-    private fun loadSettings(): AppSettings {
-        val onboarded = prefs.getBoolean("is_onboarded", false)
-        val theme = prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
-        val color = prefs.getString("color_theme", "BLUE") ?: "BLUE"
-        val delay = prefs.getInt("send_delay_seconds", 3)
-        val delivery = prefs.getBoolean("delivery_reports", true)
-        val deliveryMode = prefs.getString("delivery_report_mode", "BOTH") ?: "BOTH"
-        val sig = prefs.getString("signature_text", "") ?: ""
-        val shape = prefs.getString("bubble_shape", "ROUNDED") ?: "ROUNDED"
-        val font = prefs.getString("font_size", "NORMAL") ?: "NORMAL"
-        val vibrate = prefs.getBoolean("vibrate_on_send", true)
-        val charCounter = prefs.getBoolean("show_char_counter", true)
-        val simSlot = prefs.getInt("selected_sim_slot", 0)
-
-        val mmsSize = prefs.getString("mms_size_limit", "1MB") ?: "1MB"
-        val mmsQuality = prefs.getString("mms_image_compression_quality", "HIGH") ?: "HIGH"
-        val autoMms = prefs.getString("auto_download_mms", "ALWAYS") ?: "ALWAYS"
-        val autoSave = prefs.getBoolean("auto_save_photos", false)
-        val notifSound = prefs.getBoolean("notification_sound", true)
-        val notifVib = prefs.getString("notification_vibrate_pattern", "NORMAL") ?: "NORMAL"
-        val quickReply = prefs.getBoolean("quick_reply_popup", true)
-        val popupSize = prefs.getString("popup_preview_size", "STANDARD") ?: "STANDARD"
-        val autoRetry = prefs.getBoolean("auto_retry_after_timeout", true)
-        val repeatNotif = prefs.getInt("repeat_notification_count", 0)
-
-        return AppSettings(
-            isOnboarded = onboarded,
-            themeMode = theme,
-            colorTheme = color,
-            sendDelaySeconds = delay,
-            deliveryReports = delivery,
-            deliveryReportMode = deliveryMode,
-            signatureText = sig,
-            bubbleShape = shape,
-            fontSize = font,
-            vibrateOnSend = vibrate,
-            showCharacterCounter = charCounter,
-            selectedSimSlot = simSlot,
-            mmsSizeLimit = mmsSize,
-            mmsImageCompressionQuality = mmsQuality,
-            autoDownloadMms = autoMms,
-            autoSavePhotos = autoSave,
-            notificationSound = notifSound,
-            notificationVibratePattern = notifVib,
-            quickReplyPopup = quickReply,
-            popupPreviewSize = popupSize,
-            autoRetryAfterTimeout = autoRetry,
-            repeatNotificationCount = repeatNotif
-        )
+    private fun updateState(update: (AppSettings) -> AppSettings) {
+        _appSettings.value = update(_appSettings.value)
     }
 
     fun setOnboarded(onboarded: Boolean = true) {
@@ -200,5 +243,30 @@ class UserPreferences(context: Context) {
     fun setRepeatNotificationCount(count: Int) {
         prefs.edit().putInt("repeat_notification_count", count).apply()
         _appSettings.value = _appSettings.value.copy(repeatNotificationCount = count)
+    }
+
+    fun setUserName(name: String) {
+        prefs.edit().putString("user_name", name).apply()
+        _appSettings.value = _appSettings.value.copy(userName = name)
+    }
+
+    fun setUserPhoneNumber(phone: String) {
+        prefs.edit().putString("user_phone_number", phone).apply()
+        _appSettings.value = _appSettings.value.copy(userPhoneNumber = phone)
+    }
+
+    fun setUserAvatarColor(colorHex: String) {
+        prefs.edit().putString("user_avatar_color", colorHex).apply()
+        _appSettings.value = _appSettings.value.copy(userAvatarColor = colorHex)
+    }
+
+    fun setUserStatus(status: String) {
+        prefs.edit().putString("user_status", status).apply()
+        _appSettings.value = _appSettings.value.copy(userStatus = status)
+    }
+
+    fun setLastSmsSyncTimestamp(timestamp: Long) {
+        prefs.edit().putLong("last_sms_sync_timestamp", timestamp).apply()
+        _appSettings.value = _appSettings.value.copy(lastSmsSyncTimestamp = timestamp)
     }
 }

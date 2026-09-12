@@ -29,7 +29,8 @@ class PulseChatViewModelFactory(
             scheduledMessageDao = database.scheduledMessageDao(),
             blockedContactDao = database.blockedContactDao(),
             quickResponseDao = database.quickResponseDao(),
-            contactRepository = contactRepository
+            contactRepository = contactRepository,
+            userPreferences = userPreferences
         )
     }
 

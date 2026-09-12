@@ -53,6 +53,7 @@ class SmsReceiver : BroadcastReceiver() {
 
             val db = PulseChatDatabase.getDatabase(context)
             val contactRepo = ContactRepository()
+            val prefs = com.example.data.preference.UserPreferences(context)
             val messageRepo = MessageRepository(
                 context,
                 db.conversationDao(),
@@ -60,7 +61,8 @@ class SmsReceiver : BroadcastReceiver() {
                 db.scheduledMessageDao(),
                 db.blockedContactDao(),
                 db.quickResponseDao(),
-                contactRepo
+                contactRepo,
+                prefs
             )
 
             CoroutineScope(Dispatchers.IO).launch {

@@ -42,10 +42,11 @@ class MessageRepository(
     private val scheduledMessageDao: ScheduledMessageDao,
     private val blockedContactDao: BlockedContactDao,
     private val quickResponseDao: QuickResponseDao,
-    private val contactRepository: ContactRepository
+    private val contactRepository: ContactRepository,
+    private val userPreferences: com.example.data.preference.UserPreferences
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
-    private val smsSyncHelper = SmsSyncHelper(context, conversationDao, messageDao, contactRepository)
+    private val smsSyncHelper = SmsSyncHelper(context, conversationDao, messageDao, contactRepository, userPreferences)
 
     val syncProgress: StateFlow<SyncProgress> = smsSyncHelper.syncProgress
 

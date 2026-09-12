@@ -117,9 +117,9 @@ fun SmsPermissionBanner(
                     )
                     Text(
                         text = if (!isDefaultSms)
-                            "Make PulseChat your default SMS app for instant background notifications and seamless messaging."
+                            "Make PaiChat your default SMS app for instant background notifications and seamless messaging."
                         else
-                            "Allow PulseChat to read and send regular text messages on your phone.",
+                            "Allow PaiChat to read and send regular text messages on your phone.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                     )

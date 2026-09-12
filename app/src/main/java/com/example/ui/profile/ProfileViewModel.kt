@@ -38,6 +38,8 @@ class ProfileViewModel(
         messageRepository.getAllScheduledMessages()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val registeredContacts = contactRepository.registeredContacts
+
     private val _isDefaultSmsApp = MutableStateFlow(false)
     val isDefaultSmsApp: StateFlow<Boolean> = _isDefaultSmsApp.asStateFlow()
 
@@ -158,6 +160,22 @@ class ProfileViewModel(
 
     fun setRepeatNotificationCount(count: Int) {
         userPreferences.setRepeatNotificationCount(count)
+    }
+
+    fun setUserName(name: String) {
+        userPreferences.setUserName(name)
+    }
+
+    fun setUserPhoneNumber(phone: String) {
+        userPreferences.setUserPhoneNumber(phone)
+    }
+
+    fun setUserAvatarColor(colorHex: String) {
+        userPreferences.setUserAvatarColor(colorHex)
+    }
+
+    fun setUserStatus(status: String) {
+        userPreferences.setUserStatus(status)
     }
 
     fun unblockContact(phoneNumber: String) {

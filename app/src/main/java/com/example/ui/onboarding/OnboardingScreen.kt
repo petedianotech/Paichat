@@ -121,7 +121,7 @@ fun OnboardingScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Messages",
+                        text = "PaiChat",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = (-0.5).sp

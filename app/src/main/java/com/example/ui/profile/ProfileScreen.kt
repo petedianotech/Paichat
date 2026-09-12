@@ -85,6 +85,7 @@ import com.example.ui.theme.PrimaryIndigoLight
 import com.example.ui.theme.PrimaryLight
 import com.example.ui.theme.PrimaryPurpleLight
 import com.example.ui.theme.PrimaryRoseLight
+import com.example.ui.util.AvatarUtil
 import com.example.ui.util.TimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,6 +106,16 @@ fun ProfileScreen(
 
     var showSignatureDialog by remember { mutableStateOf(false) }
     var signatureInput by remember { mutableStateOf(appSettings.signatureText) }
+
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var nameInput by remember { mutableStateOf(appSettings.userName) }
+    var phoneInput by remember { mutableStateOf(appSettings.userPhoneNumber) }
+    var statusInput by remember { mutableStateOf(appSettings.userStatus) }
+    var selectedAvatarColor by remember { mutableStateOf(appSettings.userAvatarColor) }
+
+    val userAvatarColorParsed = remember(appSettings.userAvatarColor) {
+        try { Color(android.graphics.Color.parseColor(appSettings.userAvatarColor)) } catch (_: Exception) { PrimaryLight }
+    }
 
     val smsRoleLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -165,6 +176,133 @@ fun ProfileScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // Section 0: User Profile & Identity Card (with custom avatar colors & profile details)
+                Text(
+                    text = "My Profile & Identity",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Profile Avatar with Dynamic User Selected Color
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(CircleShape)
+                                    .background(userAvatarColorParsed),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = AvatarUtil.getInitials(appSettings.userName),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = appSettings.userName.ifBlank { "You" },
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = appSettings.userStatus.ifBlank { "SMS Messenger • Fast & Secure" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                if (appSettings.userPhoneNumber.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = appSettings.userPhoneNumber,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Profile Avatar Color",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            // Quick color chips
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val avatarPalette = listOf("#005AC1", "#4F46E5", "#7C3AED", "#9333EA", "#E11D48", "#0891B2", "#EA580C")
+                                avatarPalette.take(5).forEach { hex ->
+                                    val c = try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { PrimaryLight }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .background(c)
+                                            .clickable { viewModel.setUserAvatarColor(hex) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (appSettings.userAvatarColor.equals(hex, ignoreCase = true)) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                nameInput = appSettings.userName
+                                phoneInput = appSettings.userPhoneNumber
+                                statusInput = appSettings.userStatus
+                                selectedAvatarColor = appSettings.userAvatarColor
+                                showEditProfileDialog = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Edit Profile Details & Avatar")
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 // Section 1: Sending & Delivery (Delayed Send, Signature, Reports)
                 Text(
                     text = "Sending & Delivery",
@@ -428,7 +566,7 @@ fun ProfileScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Auto-Save Photos to Gallery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Text("Save received MMS photos to Pictures/PulseChat automatically", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Save received MMS photos to Pictures/PaiChat automatically", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Switch(
                                 checked = appSettings.autoSavePhotos,
@@ -1128,6 +1266,136 @@ fun ProfileScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { showSignatureDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // Edit Profile Dialog
+        if (showEditProfileDialog) {
+            val avatarPalette = listOf(
+                "#005AC1" to "Blue",
+                "#4F46E5" to "Indigo",
+                "#7C3AED" to "Violet",
+                "#9333EA" to "Purple",
+                "#E11D48" to "Rose",
+                "#0891B2" to "Teal",
+                "#EA580C" to "Amber",
+                "#475569" to "Slate"
+            )
+
+            AlertDialog(
+                onDismissRequest = { showEditProfileDialog = false },
+                title = { Text("Edit Profile & Identity", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Avatar Preview with currently picked color
+                        val previewColor = try { Color(android.graphics.Color.parseColor(selectedAvatarColor)) } catch (_: Exception) { PrimaryLight }
+                        Box(
+                            modifier = Modifier
+                                .size(68.dp)
+                                .align(Alignment.CenterHorizontally)
+                                .clip(CircleShape)
+                                .background(previewColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = AvatarUtil.getInitials(nameInput),
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text("Choose Avatar Color:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            avatarPalette.take(4).forEach { (hex, _) ->
+                                val c = try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { PrimaryLight }
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(c)
+                                        .clickable { selectedAvatarColor = hex },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selectedAvatarColor.equals(hex, ignoreCase = true)) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            avatarPalette.drop(4).forEach { (hex, _) ->
+                                val c = try { Color(android.graphics.Color.parseColor(hex)) } catch (_: Exception) { PrimaryLight }
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(c)
+                                        .clickable { selectedAvatarColor = hex },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selectedAvatarColor.equals(hex, ignoreCase = true)) {
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = nameInput,
+                            onValueChange = { nameInput = it },
+                            label = { Text("Display Name") },
+                            placeholder = { Text("Your Name or Nickname") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = statusInput,
+                            onValueChange = { statusInput = it },
+                            label = { Text("Status / Bio") },
+                            placeholder = { Text("e.g. Available, At work, In meetings") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        OutlinedTextField(
+                            value = phoneInput,
+                            onValueChange = { phoneInput = it },
+                            label = { Text("Phone Number / SIM Line") },
+                            placeholder = { Text("e.g. +1 555-0199") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.setUserName(nameInput.trim())
+                        viewModel.setUserPhoneNumber(phoneInput.trim())
+                        viewModel.setUserStatus(statusInput.trim())
+                        viewModel.setUserAvatarColor(selectedAvatarColor)
+                        showEditProfileDialog = false
+                    }) {
+                        Text("Save Profile")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEditProfileDialog = false }) {
                         Text("Cancel")
                     }
                 }

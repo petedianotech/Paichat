@@ -50,6 +50,7 @@ class HeadlessSmsSendService : Service() {
                 Log.d(TAG, "Sending headless quick-response SMS to $recipient: $messageText")
                 val db = PulseChatDatabase.getDatabase(applicationContext)
                 val contactRepo = ContactRepository()
+                val prefs = com.example.data.preference.UserPreferences(applicationContext)
                 val messageRepo = MessageRepository(
                     applicationContext,
                     db.conversationDao(),
@@ -57,7 +58,8 @@ class HeadlessSmsSendService : Service() {
                     db.scheduledMessageDao(),
                     db.blockedContactDao(),
                     db.quickResponseDao(),
-                    contactRepo
+                    contactRepo,
+                    prefs
                 )
 
                 CoroutineScope(Dispatchers.IO).launch {

@@ -1,9 +1,16 @@
 package com.example.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "conversations")
+@Entity(
+    tableName = "conversations",
+    indices = [
+        Index(value = ["isBlocked", "isPinned", "lastMessageTimestamp"]),
+        Index(value = ["phoneNumber"])
+    ]
+)
 data class ConversationEntity(
     @PrimaryKey val conversationId: String,
     val phoneNumber: String,
