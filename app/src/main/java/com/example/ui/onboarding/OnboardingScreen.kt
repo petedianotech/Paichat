@@ -339,6 +339,8 @@ fun OnboardingScreen(
                     }
                 }
 
+                val isSyncingState by viewModel.isSyncing.collectAsState()
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -346,8 +348,11 @@ fun OnboardingScreen(
                 ) {
                     Button(
                         onClick = {
-                            viewModel.completeOnboarding(context, onOnboardingComplete)
+                            if (!isSyncingState) {
+                                viewModel.completeOnboarding(context, onOnboardingComplete)
+                            }
                         },
+                        enabled = !isSyncingState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp)
@@ -357,13 +362,31 @@ fun OnboardingScreen(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text(
-                            text = "Start Messaging",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
+                        if (isSyncingState) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Syncing messages & contacts...",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "Start Messaging",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }

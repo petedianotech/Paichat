@@ -14,8 +14,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -109,7 +112,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -157,6 +162,8 @@ fun ChatThreadScreen(
     var showTopMenu by remember { mutableStateOf(false) }
     var showColorPicker by remember { mutableStateOf(false) }
     var showScheduleDialog by remember { mutableStateOf(false) }
+    var showContactDetailsSheet by remember { mutableStateOf(false) }
+    var showWallpaperPickerSheet by remember { mutableStateOf(false) }
     var newQuickResponseText by remember { mutableStateOf("") }
     var showAddQuickResponseDialog by remember { mutableStateOf(false) }
     var pendingActionAfterPermission by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -224,6 +231,9 @@ fun ChatThreadScreen(
     }
 
     val backgroundGradient = LocalThemeGradient.current
+    val activeWallpaperId = conversation?.customWallpaper ?: appSettings.defaultChatWallpaper
+    val activeWallpaper = ChatWallpapers.getWallpaperById(activeWallpaperId)
+
     val contactDisplayName = conversation?.contactName ?: conversation?.phoneNumber ?: "Chat"
     val avatarColor = AvatarUtil.getAvatarColor(conversation?.phoneNumber ?: "")
 
@@ -237,6 +247,23 @@ fun ChatThreadScreen(
             .fillMaxSize()
             .background(backgroundGradient)
     ) {
+        if (activeWallpaper != null) {
+            Image(
+                painter = painterResource(id = activeWallpaper.drawableRes),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        if (activeWallpaper.isDarkTheme) Color.Black.copy(alpha = 0.45f)
+                        else Color.White.copy(alpha = 0.4f)
+                    )
+            )
+        }
+
         Scaffold(
             modifier = Modifier.imePadding(),
             containerColor = Color.Transparent,
@@ -246,7 +273,11 @@ fun ChatThreadScreen(
                     title = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showContactDetailsSheet = true }
+                                .padding(vertical = 4.dp, horizontal = 2.dp)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -328,15 +359,56 @@ fun ChatThreadScreen(
                             expanded = showTopMenu,
                             onDismissRequest = { showTopMenu = false }
                         ) {
+                            // Call Contact
                             DropdownMenuItem(
-                                text = { Text(if (conversation?.isPinned == true) "Unpin Conversation" else "Pin to Top") },
+                                text = { Text("Call Contact") },
                                 onClick = {
-                                    viewModel.togglePin()
                                     showTopMenu = false
+                                    if (!phone.isNullOrBlank()) {
+                                        try {
+                                            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                            context.startActivity(dialIntent)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(context, "Could not open dialer", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                 },
-                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                                leadingIcon = { Icon(Icons.Default.Call, contentDescription = null) }
                             )
 
+                            // View Contact Details
+                            DropdownMenuItem(
+                                text = { Text("View Contact Details") },
+                                onClick = {
+                                    showTopMenu = false
+                                    showContactDetailsSheet = true
+                                },
+                                leadingIcon = { Icon(Icons.Default.ContactPage, contentDescription = null) }
+                            )
+
+                            // Save Contact to Phone
+                            DropdownMenuItem(
+                                text = { Text("Save Contact to Phone") },
+                                onClick = {
+                                    showTopMenu = false
+                                    if (!phone.isNullOrBlank()) {
+                                        saveContactToPhone(context, phone, conversation?.contactName)
+                                    }
+                                },
+                                leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) }
+                            )
+
+                            // Choose Chat Wallpaper
+                            DropdownMenuItem(
+                                text = { Text("Chat Wallpaper") },
+                                onClick = {
+                                    showTopMenu = false
+                                    showWallpaperPickerSheet = true
+                                },
+                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) }
+                            )
+
+                            // Conversation Color
                             DropdownMenuItem(
                                 text = { Text("Conversation Color") },
                                 onClick = {
@@ -346,12 +418,27 @@ fun ChatThreadScreen(
                                 leadingIcon = { Icon(Icons.Default.ColorLens, contentDescription = null) }
                             )
 
+                            // Pin / Unpin
                             DropdownMenuItem(
-                                text = { Text("Block Number") },
+                                text = { Text(if (conversation?.isPinned == true) "Unpin Conversation" else "Pin to Top") },
                                 onClick = {
-                                    viewModel.blockContact()
+                                    viewModel.togglePin()
                                     showTopMenu = false
-                                    onNavigateBack()
+                                },
+                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                            )
+
+                            // Block / Unblock Number
+                            DropdownMenuItem(
+                                text = { Text(if (conversation?.isBlocked == true) "Unblock Number" else "Block Number") },
+                                onClick = {
+                                    showTopMenu = false
+                                    if (conversation?.isBlocked == true) {
+                                        viewModel.unblockContact()
+                                    } else {
+                                        viewModel.blockContact()
+                                        onNavigateBack()
+                                    }
                                 },
                                 leadingIcon = { Icon(Icons.Default.Block, contentDescription = null) }
                             )
@@ -1151,6 +1238,36 @@ fun ChatThreadScreen(
                             viewModel.scheduleMessage(timestamp)
                             showScheduleDialog = false
                             Toast.makeText(context, "Message scheduled successfully", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                }
+
+                // Contact Details Bottom Sheet
+                if (showContactDetailsSheet) {
+                    ContactDetailsSheet(
+                        conversation = conversation,
+                        totalMessagesCount = messages.size,
+                        onDismiss = { showContactDetailsSheet = false },
+                        onTogglePin = { viewModel.togglePin() },
+                        onToggleBlock = {
+                            if (conversation?.isBlocked == true) {
+                                viewModel.unblockContact()
+                            } else {
+                                viewModel.blockContact()
+                            }
+                        },
+                        onChangeColor = { showColorPicker = true },
+                        onChangeWallpaper = { showWallpaperPickerSheet = true }
+                    )
+                }
+
+                // Chat Wallpaper Picker Bottom Sheet
+                if (showWallpaperPickerSheet) {
+                    ChatWallpaperPickerSheet(
+                        currentWallpaperId = activeWallpaperId,
+                        onDismiss = { showWallpaperPickerSheet = false },
+                        onSelectWallpaper = { wallpaperId ->
+                            viewModel.setCustomWallpaper(wallpaperId)
                         }
                     )
                 }

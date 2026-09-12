@@ -18,6 +18,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
         const val ACTION_MARK_READ = "com.example.ACTION_MARK_READ"
         const val ACTION_QUICK_REPLY = "com.example.ACTION_QUICK_REPLY"
         const val ACTION_RETRY_SEND = "com.example.ACTION_RETRY_SEND"
+        const val ACTION_CANCEL_RETRY = "com.example.ACTION_CANCEL_RETRY"
         const val EXTRA_CONVERSATION_ID = "extra_conversation_id"
         const val EXTRA_MESSAGE_ID = "extra_message_id"
         const val KEY_TEXT_REPLY = "key_text_reply"
@@ -72,6 +73,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
                         val messageId = intent.getStringExtra(EXTRA_MESSAGE_ID)
                         if (!messageId.isNullOrBlank()) {
                             messageRepo.retryMessage(messageId)
+                            notificationManager.cancel(messageId.hashCode())
+                        }
+                    }
+
+                    ACTION_CANCEL_RETRY -> {
+                        val messageId = intent.getStringExtra(EXTRA_MESSAGE_ID)
+                        if (!messageId.isNullOrBlank()) {
+                            messageRepo.cancelRetry(messageId)
                             notificationManager.cancel(messageId.hashCode())
                         }
                     }

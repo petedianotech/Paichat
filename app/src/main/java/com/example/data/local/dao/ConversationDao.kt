@@ -46,6 +46,9 @@ interface ConversationDao {
     @Query("UPDATE conversations SET customColorHex = :colorHex WHERE conversationId = :id")
     suspend fun setCustomColor(id: String, colorHex: String?)
 
+    @Query("UPDATE conversations SET customWallpaper = :wallpaper WHERE conversationId = :id")
+    suspend fun setCustomWallpaper(id: String, wallpaper: String?)
+
     @Query("DELETE FROM conversations WHERE conversationId = :id")
     suspend fun deleteConversationById(id: String)
 

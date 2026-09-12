@@ -25,7 +25,7 @@ import com.example.data.local.entity.ScheduledMessageEntity
         BlockedContactEntity::class,
         QuickResponseEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

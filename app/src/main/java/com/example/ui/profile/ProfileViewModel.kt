@@ -114,6 +114,10 @@ class ProfileViewModel(
         userPreferences.setFontSize(size)
     }
 
+    fun setFontFamily(font: String) {
+        userPreferences.setFontFamily(font)
+    }
+
     fun setVibrateOnSend(enabled: Boolean) {
         userPreferences.setVibrateOnSend(enabled)
     }

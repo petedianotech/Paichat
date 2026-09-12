@@ -16,6 +16,7 @@ data class AppSettings(
     val signatureText: String = "",
     val bubbleShape: String = "ROUNDED", // ROUNDED, PILL, SQUARE
     val fontSize: String = "NORMAL", // SMALL, NORMAL, LARGE, EXTRA_LARGE
+    val fontFamily: String = "DEFAULT", // 10+ font family keys
     val vibrateOnSend: Boolean = true,
     val showCharacterCounter: Boolean = true,
     val selectedSimSlot: Int = 0, // 0 = SIM 1, 1 = SIM 2
@@ -36,7 +37,8 @@ data class AppSettings(
     val userPhoneNumber: String = "",
     val userAvatarColor: String = "#005AC1",
     val userStatus: String = "SMS Messenger • Fast & Secure",
-    val lastSmsSyncTimestamp: Long = 0L
+    val lastSmsSyncTimestamp: Long = 0L,
+    val defaultChatWallpaper: String = "NONE"
 )
 
 class UserPreferences(context: Context) {
@@ -74,6 +76,7 @@ class UserPreferences(context: Context) {
             val sig = prefs.getString("signature_text", "") ?: ""
             val shape = prefs.getString("bubble_shape", "ROUNDED") ?: "ROUNDED"
             val font = prefs.getString("font_size", "NORMAL") ?: "NORMAL"
+            val fontFam = prefs.getString("font_family", "DEFAULT") ?: "DEFAULT"
             val vibrate = prefs.getBoolean("vibrate_on_send", true)
             val charCounter = prefs.getBoolean("show_char_counter", true)
             val simSlot = prefs.getInt("selected_sim_slot", 0)
@@ -93,6 +96,7 @@ class UserPreferences(context: Context) {
             val uAvatarColor = prefs.getString("user_avatar_color", "#005AC1") ?: "#005AC1"
             val uStatus = prefs.getString("user_status", "SMS Messenger • Fast & Secure") ?: "SMS Messenger • Fast & Secure"
             val lastSync = prefs.getLong("last_sms_sync_timestamp", 0L)
+            val wallpaper = prefs.getString("default_chat_wallpaper", "NONE") ?: "NONE"
 
             return AppSettings(
                 isOnboarded = onboarded,
@@ -104,6 +108,7 @@ class UserPreferences(context: Context) {
                 signatureText = sig,
                 bubbleShape = shape,
                 fontSize = font,
+                fontFamily = fontFam,
                 vibrateOnSend = vibrate,
                 showCharacterCounter = charCounter,
                 selectedSimSlot = simSlot,
@@ -121,7 +126,8 @@ class UserPreferences(context: Context) {
                 userPhoneNumber = uPhone,
                 userAvatarColor = uAvatarColor,
                 userStatus = uStatus,
-                lastSmsSyncTimestamp = lastSync
+                lastSmsSyncTimestamp = lastSync,
+                defaultChatWallpaper = wallpaper
             )
         }
     }
@@ -178,6 +184,11 @@ class UserPreferences(context: Context) {
     fun setFontSize(size: String) {
         prefs.edit().putString("font_size", size).apply()
         _appSettings.value = _appSettings.value.copy(fontSize = size)
+    }
+
+    fun setFontFamily(font: String) {
+        prefs.edit().putString("font_family", font).apply()
+        _appSettings.value = _appSettings.value.copy(fontFamily = font)
     }
 
     fun setVibrateOnSend(enabled: Boolean) {
@@ -268,5 +279,10 @@ class UserPreferences(context: Context) {
     fun setLastSmsSyncTimestamp(timestamp: Long) {
         prefs.edit().putLong("last_sms_sync_timestamp", timestamp).apply()
         _appSettings.value = _appSettings.value.copy(lastSmsSyncTimestamp = timestamp)
+    }
+
+    fun setDefaultChatWallpaper(wallpaper: String) {
+        prefs.edit().putString("default_chat_wallpaper", wallpaper).apply()
+        _appSettings.value = _appSettings.value.copy(defaultChatWallpaper = wallpaper)
     }
 }

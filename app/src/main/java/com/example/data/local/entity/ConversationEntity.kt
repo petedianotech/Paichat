@@ -21,5 +21,6 @@ data class ConversationEntity(
     val isInternetUser: Boolean = false,
     val isPinned: Boolean = false,
     val isBlocked: Boolean = false,
-    val customColorHex: String? = null
+    val customColorHex: String? = null,
+    val customWallpaper: String? = null
 )

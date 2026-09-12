@@ -257,6 +257,24 @@ object NotificationHelper {
             retryPendingIntent
         ).build()
 
+        val cancelIntent = Intent(context, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_CANCEL_RETRY
+            putExtra(NotificationActionReceiver.EXTRA_MESSAGE_ID, messageId)
+            putExtra(NotificationActionReceiver.EXTRA_CONVERSATION_ID, recipientPhone)
+        }
+        val cancelPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId + 10,
+            cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val cancelAction = NotificationCompat.Action.Builder(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            "Cancel Send ❌",
+            cancelPendingIntent
+        ).build()
+
         val statusMsg = if (isAutoRetrying) {
             "SMS is taking over 60s to send. Auto-retrying send..."
         } else {
@@ -272,6 +290,7 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
             .addAction(retryAction)
+            .addAction(cancelAction)
 
         val notificationManager = NotificationManagerCompat.from(context)
         try {

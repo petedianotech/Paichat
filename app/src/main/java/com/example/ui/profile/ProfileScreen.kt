@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.FontDownload
+import androidx.compose.material.icons.filled.TextFields
+import com.example.ui.theme.AppFonts
 import androidx.compose.material.icons.filled.FormatShapes
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.Info
@@ -892,6 +895,39 @@ fun ProfileScreen(
                                     selected = appSettings.fontSize == size,
                                     onClick = { viewModel.setFontSize(size) },
                                     label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Font Family
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("App Font Style", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            AppFonts.fontsList.forEach { option ->
+                                FilterChip(
+                                    selected = appSettings.fontFamily == option.key,
+                                    onClick = { viewModel.setFontFamily(option.key) },
+                                    label = { 
+                                        Text(
+                                            text = option.displayName,
+                                            fontFamily = AppFonts.getFontFamily(option.key),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (appSettings.fontFamily == option.key) FontWeight.Bold else FontWeight.Normal
+                                        ) 
+                                    }
                                 )
                             }
                         }

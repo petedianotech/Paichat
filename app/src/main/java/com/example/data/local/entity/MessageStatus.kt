@@ -5,5 +5,6 @@ enum class MessageStatus {
     SENT,
     DELIVERED,
     READ,
-    FAILED
+    FAILED,
+    CANCELLED
 }

@@ -178,7 +178,8 @@ class SmsSyncHelper(
                     isInternetUser = existing?.isInternetUser ?: false,
                     isPinned = existing?.isPinned ?: false,
                     isBlocked = existing?.isBlocked ?: false,
-                    customColorHex = existing?.customColorHex
+                    customColorHex = existing?.customColorHex,
+                    customWallpaper = existing?.customWallpaper
                 )
                 conversationDao.insertConversation(conv)
             }
@@ -316,7 +317,8 @@ class SmsSyncHelper(
                 isInternetUser = existing?.isInternetUser ?: false,
                 isPinned = existing?.isPinned ?: false,
                 isBlocked = existing?.isBlocked ?: false,
-                customColorHex = existing?.customColorHex
+                customColorHex = existing?.customColorHex,
+                customWallpaper = existing?.customWallpaper
             )
             conversationsToInsert.add(conv)
         }

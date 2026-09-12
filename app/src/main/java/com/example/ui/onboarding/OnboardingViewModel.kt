@@ -58,13 +58,18 @@ class OnboardingViewModel(
         }
     }
 
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
     fun completeOnboarding(context: Context, onComplete: () -> Unit) {
-        userPreferences.setOnboarded(true)
+        _isSyncing.value = true
         viewModelScope.launch {
             try {
                 contactRepository.syncDeviceContacts(context)
                 messageRepository.syncDeviceSms()
             } catch (_: Exception) {}
+            userPreferences.setOnboarded(true)
+            _isSyncing.value = false
             onComplete()
         }
     }

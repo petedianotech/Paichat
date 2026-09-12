@@ -174,6 +174,7 @@ fun MessageBubble(
         MessageStatus.SENDING -> "Sending"
         MessageStatus.FAILED -> "Failed to send"
         MessageStatus.READ -> "Read"
+        MessageStatus.CANCELLED -> "Cancelled"
     }
     val accessibilityDescription = "$senderLabel at ${TimeFormatter.formatMessageTimestamp(message.timestamp)}: ${message.content}. Status: $statusLabel. Double tap and hold for options."
 
@@ -441,6 +442,14 @@ fun MessageBubble(
                                     contentDescription = "Failed",
                                     modifier = Modifier.size(14.dp),
                                     tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            MessageStatus.CANCELLED -> {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = "Cancelled",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = contentColor.copy(alpha = 0.5f)
                                 )
                             }
                         }

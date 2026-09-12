@@ -128,7 +128,8 @@ class QuickReplyActivity : ComponentActivity() {
 
             PaiChatTheme(
                 themeMode = appSettings.themeMode,
-                colorTheme = appSettings.colorTheme
+                colorTheme = appSettings.colorTheme,
+                fontFamily = appSettings.fontFamily
             ) {
                 QuickReplyPopupScreen(
                     conversationId = conversationId,

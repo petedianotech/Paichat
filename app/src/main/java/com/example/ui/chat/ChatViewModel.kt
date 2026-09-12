@@ -321,10 +321,24 @@ class ChatViewModel(
         }
     }
 
+    fun unblockContact() {
+        val conv = _conversation.value ?: return
+        viewModelScope.launch {
+            messageRepository.unblockContact(conv.phoneNumber)
+        }
+    }
+
     fun setCustomColor(colorHex: String?) {
         val conv = _conversation.value ?: return
         viewModelScope.launch {
             messageRepository.setConversationCustomColor(conv.conversationId, colorHex)
+        }
+    }
+
+    fun setCustomWallpaper(wallpaperId: String?) {
+        val conv = _conversation.value ?: return
+        viewModelScope.launch {
+            messageRepository.setConversationCustomWallpaper(conv.conversationId, wallpaperId)
         }
     }
 

@@ -97,6 +97,7 @@ private val AmoledDarkColorScheme = darkColorScheme(
 fun PaiChatTheme(
     themeMode: String = "SYSTEM",
     colorTheme: String = "BLUE",
+    fontFamily: String = "DEFAULT",
     content: @Composable () -> Unit
 ) {
     val isSystemDark = isSystemInDarkTheme()
@@ -159,7 +160,7 @@ fun PaiChatTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = AppFonts.getDynamicTypography(fontFamily),
             content = content
         )
     }

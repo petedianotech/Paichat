@@ -123,6 +123,10 @@ class MessageRepository(
         conversationDao.setCustomColor(conversationId, colorHex)
     }
 
+    suspend fun setConversationCustomWallpaper(conversationId: String, wallpaper: String?) {
+        conversationDao.setCustomWallpaper(conversationId, wallpaper)
+    }
+
     suspend fun blockContact(phoneNumber: String, contactName: String?, reason: String? = null) {
         blockedContactDao.block(
             BlockedContactEntity(
@@ -217,7 +221,8 @@ class MessageRepository(
             isInternetUser = false,
             isPinned = existingConversation?.isPinned ?: false,
             isBlocked = existingConversation?.isBlocked ?: false,
-            customColorHex = existingConversation?.customColorHex
+            customColorHex = existingConversation?.customColorHex,
+            customWallpaper = existingConversation?.customWallpaper
         )
         conversationDao.insertConversation(updatedConversation)
 
@@ -318,6 +323,14 @@ class MessageRepository(
         }
 
         startMessageTimeoutWatcher(messageId, message.recipientPhoneNumber, null, message.content)
+    }
+
+    suspend fun cancelRetry(messageId: String) {
+        val message = messageDao.getMessageById(messageId) ?: return
+        val updated = message.copy(
+            status = MessageStatus.CANCELLED
+        )
+        messageDao.updateMessage(updated)
     }
 
     private suspend fun sendSmsMessageProcess(
@@ -450,7 +463,8 @@ class MessageRepository(
             isInternetUser = false,
             isPinned = existingConversation?.isPinned ?: false,
             isBlocked = false,
-            customColorHex = existingConversation?.customColorHex
+            customColorHex = existingConversation?.customColorHex,
+            customWallpaper = existingConversation?.customWallpaper
         )
         conversationDao.insertConversation(conversation)
 

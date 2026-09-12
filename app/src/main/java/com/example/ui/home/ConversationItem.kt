@@ -85,9 +85,23 @@ fun ConversationItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(vertical = 12.dp)
+                .padding(end = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (isUnread) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(36.dp)
+                        .clip(RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 4.dp, bottomEnd = 4.dp))
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+            } else {
+                Spacer(modifier = Modifier.width(14.dp))
+            }
+
             // Enhanced Avatar with Vibrant Radial/Gradient Depth
             Box(
                 modifier = Modifier
