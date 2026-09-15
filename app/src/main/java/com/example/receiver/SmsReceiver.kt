@@ -78,6 +78,13 @@ class SmsReceiver : BroadcastReceiver() {
 
                     for ((sender, bodyBuilder) in senderToBodyMap) {
                         val fullBody = bodyBuilder.toString()
+
+                        // Prevent duplicate processing if both SMS_DELIVER and SMS_RECEIVED are broadcast
+                        if (com.example.ui.util.MessageDeduplicator.isDuplicateAndMark(sender, fullBody)) {
+                            Log.d(TAG, "Duplicate incoming SMS detected from $sender - ignoring duplicate event")
+                            continue
+                        }
+
                         Log.d(TAG, "Processing incoming SMS from $sender (${fullBody.length} chars)")
 
                         messageRepo.receiveIncomingMessage(

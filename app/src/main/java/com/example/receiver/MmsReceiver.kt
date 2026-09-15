@@ -66,6 +66,11 @@ class MmsReceiver : BroadcastReceiver() {
                         val sender = extractSenderFromPdu(pdu) ?: "Unknown Sender"
                         val contentText = "[MMS Multimedia Message]"
 
+                        if (com.example.ui.util.MessageDeduplicator.isDuplicateAndMark(sender, contentText)) {
+                            Log.d(TAG, "Duplicate incoming MMS detected from $sender - ignoring")
+                            return@launch
+                        }
+
                         messageRepo.receiveIncomingMessage(
                             senderPhone = sender,
                             senderName = null,

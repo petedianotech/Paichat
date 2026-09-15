@@ -173,6 +173,19 @@ fun ChatThreadScreen(
 
     val listState = rememberLazyListState()
 
+    // Track active conversation to suppress redundant popups while user is in this chat
+    val currentConvId = conversation?.conversationId
+    androidx.compose.runtime.DisposableEffect(currentConvId) {
+        if (!currentConvId.isNullOrBlank()) {
+            com.example.ui.util.ActiveConversationTracker.activeConversationId = currentConvId
+        }
+        onDispose {
+            if (com.example.ui.util.ActiveConversationTracker.activeConversationId == currentConvId) {
+                com.example.ui.util.ActiveConversationTracker.activeConversationId = null
+            }
+        }
+    }
+
     // Paging and Scroll Position Preservation State
     var isInitialLoad by remember { mutableStateOf(true) }
     var firstVisibleItemKey by remember { mutableStateOf<Any?>(null) }

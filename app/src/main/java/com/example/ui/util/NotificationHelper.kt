@@ -155,6 +155,7 @@ object NotificationHelper {
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .setContentIntent(openPendingIntent)
+            .setFullScreenIntent(popupPendingIntent, false)
             .addAction(popupAction)
             .addAction(replyAction)
             .addAction(readAction)
@@ -185,6 +186,34 @@ object NotificationHelper {
             notificationManager.notify(notificationId, notification)
         } catch (_: SecurityException) {
             // Permission not granted
+        }
+    }
+
+    /**
+     * Direct launcher for the custom preview popup window.
+     * Launches QuickReplyActivity in an isolated, floating task that overlays on top of the
+     * user's current app (such as YouTube, Chrome, etc.) without pulling the main app to foreground.
+     */
+    fun launchQuickReplyPopup(
+        context: Context,
+        senderPhone: String,
+        senderName: String?,
+        messageText: String
+    ) {
+        try {
+            val popupIntent = Intent(context, com.example.ui.quickreply.QuickReplyActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS
+                putExtra("conversationId", senderPhone)
+                putExtra("senderPhone", senderPhone)
+                putExtra("senderName", senderName ?: senderPhone)
+                putExtra("initialMessage", messageText)
+            }
+            context.startActivity(popupIntent)
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationHelper", "Could not start QuickReplyActivity: ${e.message}")
         }
     }
 

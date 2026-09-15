@@ -53,14 +53,18 @@
             </intent-filter>
         </activity>
 
-        <!-- Quick Reply Popup Dialog Activity -->
+        <!-- Quick Reply Popup Dialog Activity (Isolated task for instant overlay & dismiss) -->
         <activity
             android:name=".ui.quickreply.QuickReplyActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:taskAffinity="com.example.quickreply"
             android:excludeFromRecents="true"
+            android:noHistory="false"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
             android:theme="@style/Theme.QuickReply"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize|stateVisible" />
 
         <!-- BroadcastReceiver for incoming SMS -->
         <receiver

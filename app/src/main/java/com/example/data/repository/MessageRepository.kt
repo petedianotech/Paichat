@@ -393,14 +393,18 @@ class MessageRepository(
             val sentIntent = PendingIntent.getBroadcast(
                 context,
                 messageId.hashCode(),
-                Intent("com.example.SMS_SENT", Uri.parse("sms-sent://$messageId"), context, SmsStatusReceiver::class.java),
+                Intent("com.example.SMS_SENT", Uri.parse("sms-sent://$messageId"), context, SmsStatusReceiver::class.java).apply {
+                    putExtra("extra_message_id", messageId)
+                },
                 flags
             )
 
             val deliveryIntent = PendingIntent.getBroadcast(
                 context,
-                messageId.hashCode(),
-                Intent("com.example.SMS_DELIVERED", Uri.parse("sms-delivered://$messageId"), context, SmsStatusReceiver::class.java),
+                messageId.hashCode() + 1,
+                Intent("com.example.SMS_DELIVERED", Uri.parse("sms-delivered://$messageId"), context, SmsStatusReceiver::class.java).apply {
+                    putExtra("extra_message_id", messageId)
+                },
                 flags
             )
 
@@ -449,8 +453,15 @@ class MessageRepository(
 
         val conversationId = senderPhone
         val timestamp = System.currentTimeMillis()
-        val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
 
+        // 1. Database-level deduplication check
+        val recentDuplicate = messageDao.findRecentIncomingMessage(senderPhone, content, timestamp - 10_000L)
+        if (recentDuplicate != null) {
+            android.util.Log.d("MessageRepository", "Duplicate message from $senderPhone already stored in DB - ignoring")
+            return
+        }
+
+        val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
         val unread = (existingConversation?.unreadCount ?: 0) + 1
         val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
 
@@ -489,13 +500,26 @@ class MessageRepository(
         )
         messageDao.insertMessage(message)
 
-        // Trigger system notification for incoming message
+        val appSettings = userPreferences.appSettings.value
+
+        // 2. Trigger standard Android notification (always reliable in notification shade)
         NotificationHelper.showIncomingMessageNotification(
             context = context,
             senderPhone = senderPhone,
             senderName = resolvedName,
-            messageText = content
+            messageText = content,
+            vibratePattern = appSettings.notificationVibratePattern
         )
+
+        // 3. Trigger custom preview popup if enabled in settings and user is not already active in this chat
+        if (appSettings.quickReplyPopup && com.example.ui.util.ActiveConversationTracker.activeConversationId != senderPhone) {
+            NotificationHelper.launchQuickReplyPopup(
+                context = context,
+                senderPhone = senderPhone,
+                senderName = resolvedName,
+                messageText = content
+            )
+        }
     }
 
     suspend fun deleteConversation(conversationId: String) {

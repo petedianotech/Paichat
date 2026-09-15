@@ -49,6 +49,15 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE messageId = :messageId")
     suspend fun getMessageById(messageId: String): MessageEntity?
 
+    @Query("""
+        SELECT * FROM messages 
+        WHERE senderPhoneNumber = :sender 
+          AND content = :content 
+          AND timestamp >= :sinceTimestamp 
+        LIMIT 1
+    """)
+    suspend fun findRecentIncomingMessage(sender: String, content: String, sinceTimestamp: Long): MessageEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMessage(message: MessageEntity)
 

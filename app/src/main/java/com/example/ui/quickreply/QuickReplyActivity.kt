@@ -9,8 +9,10 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,10 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -67,10 +66,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import com.example.MainActivity
 import com.example.data.local.database.PulseChatDatabase
 import com.example.data.local.entity.MessageEntity
@@ -81,10 +82,22 @@ import com.example.ui.theme.PaiChatTheme
 import com.example.ui.util.TimeFormatter
 import kotlinx.coroutines.launch
 
+/**
+ * Textra-style Preview & Quick Reply Floating Overlay Activity.
+ * Runs in an isolated task (taskAffinity="com.example.quickreply", excludeFromRecents=true).
+ * When closed, it immediately finishes and reveals whatever app was underneath (YouTube, Browser, etc.)
+ * without bringing the main messaging app to the foreground.
+ */
 class QuickReplyActivity : ComponentActivity() {
+
+    private var activeConversationId by mutableStateOf("")
+    private var activeSenderPhone by mutableStateOf("")
+    private var activeSenderName by mutableStateOf<String?>(null)
+    private var activeInitialMessage by mutableStateOf("")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -97,19 +110,14 @@ class QuickReplyActivity : ComponentActivity() {
             )
         }
 
-        val conversationId = intent.getStringExtra("conversationId") ?: intent.getStringExtra("senderPhone") ?: ""
-        val senderPhone = intent.getStringExtra("senderPhone") ?: conversationId
-        val senderName = intent.getStringExtra("senderName")
-        val initialMessage = intent.getStringExtra("initialMessage") ?: ""
+        updateFromIntent(intent)
 
-        if (conversationId.isBlank()) {
-            finish()
+        if (activeConversationId.isBlank()) {
+            dismissAndClose()
             return
         }
 
         val userPreferences = UserPreferences(applicationContext)
-
-        // Initialize dependencies
         val database = PulseChatDatabase.getDatabase(applicationContext)
         val contactRepository = ContactRepository()
         val messageRepository = MessageRepository(
@@ -132,24 +140,56 @@ class QuickReplyActivity : ComponentActivity() {
                 fontFamily = appSettings.fontFamily
             ) {
                 QuickReplyPopupScreen(
-                    conversationId = conversationId,
-                    senderPhone = senderPhone,
-                    senderName = senderName,
-                    initialMessage = initialMessage,
+                    conversationId = activeConversationId,
+                    senderPhone = activeSenderPhone,
+                    senderName = activeSenderName,
+                    initialMessage = activeInitialMessage,
                     messageRepository = messageRepository,
                     userPreferences = userPreferences,
-                    onDismiss = { finish() },
+                    onDismiss = { dismissAndClose() },
                     onOpenFullChat = {
                         val openIntent = Intent(this, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            putExtra("conversationId", conversationId)
+                            putExtra("conversationId", activeConversationId)
                         }
                         startActivity(openIntent)
-                        finish()
+                        dismissAndClose()
                     }
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        updateFromIntent(intent)
+    }
+
+    private fun updateFromIntent(intent: Intent?) {
+        if (intent == null) return
+        val convId = intent.getStringExtra("conversationId") ?: intent.getStringExtra("senderPhone") ?: ""
+        val phone = intent.getStringExtra("senderPhone") ?: convId
+        val name = intent.getStringExtra("senderName")
+        val msg = intent.getStringExtra("initialMessage") ?: ""
+
+        if (convId.isNotBlank()) {
+            activeConversationId = convId
+            activeSenderPhone = phone
+            activeSenderName = name
+            activeInitialMessage = msg
+        }
+    }
+
+    private fun dismissAndClose() {
+        finishAndRemoveTask()
+        overridePendingTransition(0, 0)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        super.onBackPressed()
+        dismissAndClose()
     }
 }
 
@@ -171,7 +211,7 @@ fun QuickReplyPopupScreen(
     var showSizeMenu by remember { mutableStateOf(false) }
 
     val appSettings by userPreferences.appSettings.collectAsState()
-    val messages by messageRepository.getMessagesForConversationPaged(conversationId, 30)
+    val messages by messageRepository.getMessagesForConversationPaged(conversationId, 25)
         .collectAsState(initial = emptyList())
 
     val quickResponses by messageRepository.getAllQuickResponses()
@@ -181,9 +221,9 @@ fun QuickReplyPopupScreen(
 
     // Dynamic Preview Sizing based on user preference
     val (widthFraction, heightFraction) = when (appSettings.popupPreviewSize) {
-        "COMPACT" -> Pair(0.86f, 0.54f)
-        "LARGE" -> Pair(0.98f, 0.88f)
-        else -> Pair(0.92f, 0.72f) // STANDARD
+        "COMPACT" -> Pair(0.86f, 0.52f)
+        "LARGE" -> Pair(0.96f, 0.86f)
+        else -> Pair(0.92f, 0.70f) // STANDARD
     }
 
     // Check system overlay permission ("Appear on top of other apps")
@@ -193,10 +233,10 @@ fun QuickReplyPopupScreen(
         true
     }
 
-    // Scroll to latest message when messages load
-    val imeBottom = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)
-    LaunchedEffect(imeBottom) {
-        if (imeBottom > 0 && messages.isNotEmpty()) {
+    // Scroll to latest message when new messages arrive or keyboard opens
+    val imeHeight = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(imeHeight) {
+        if (imeHeight > 0 && messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
@@ -213,28 +253,34 @@ fun QuickReplyPopupScreen(
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
-            .background(Color.Black.copy(alpha = 0.60f))
-            .clickable { onDismiss() },
+            .background(Color.Black.copy(alpha = 0.50f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth(widthFraction)
                 .fillMaxHeight(heightFraction)
-                .clickable(enabled = false) {}
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { /* Intercept tap on the card body */ }
                 .testTag("quick_reply_popup_card"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(14.dp)
             ) {
-                // 1. Popup Top Header Bar with Size Switcher
+                // 1. Header Bar: Avatar, Contact info, Actions
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -246,7 +292,7 @@ fun QuickReplyPopupScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(38.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
@@ -266,12 +312,14 @@ fun QuickReplyPopupScreen(
                                 text = displayName,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1
                             )
                             Text(
                                 text = senderPhone,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
                             )
                         }
                     }
@@ -279,11 +327,15 @@ fun QuickReplyPopupScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Size Selection Dropdown Button
                         Box {
-                            IconButton(onClick = { showSizeMenu = true }) {
+                            IconButton(
+                                onClick = { showSizeMenu = true },
+                                modifier = Modifier.size(36.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.AspectRatio,
                                     contentDescription = "Change Preview Size",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                             DropdownMenu(
@@ -314,38 +366,47 @@ fun QuickReplyPopupScreen(
                             }
                         }
 
-                        IconButton(onClick = onOpenFullChat) {
+                        IconButton(
+                            onClick = onOpenFullChat,
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = "Open full chat",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
-                        IconButton(onClick = onDismiss) {
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Close",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Overlay Permission Banner if not granted
+                // Overlay Permission Banner (if not granted on Android M+)
                 if (!canDrawOverlays && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                            .padding(bottom = 6.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.secondaryContainer
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -357,12 +418,12 @@ fun QuickReplyPopupScreen(
                                     imageVector = Icons.Default.Layers,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Enable 'Appear on top' to reply over other apps",
-                                    style = MaterialTheme.typography.labelMedium,
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
                             }
@@ -375,7 +436,7 @@ fun QuickReplyPopupScreen(
                                     context.startActivity(intent)
                                 }
                             ) {
-                                Text("Grant", fontWeight = FontWeight.Bold)
+                                Text("Grant", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -385,9 +446,9 @@ fun QuickReplyPopupScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // 2. Scrollable Message Thread Preview
                 Box(
@@ -399,27 +460,27 @@ fun QuickReplyPopupScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(16.dp),
+                                .padding(12.dp),
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             if (initialMessage.isNotBlank()) {
                                 Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    modifier = Modifier.padding(8.dp)
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.padding(6.dp)
                                 ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
                                         Text(
                                             text = initialMessage,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
                             } else {
                                 Text(
-                                    text = "Quick reply preview",
+                                    text = "No previous messages",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -431,21 +492,21 @@ fun QuickReplyPopupScreen(
                             modifier = Modifier.fillMaxSize(),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(messages.takeLast(20)) { msg ->
+                            items(messages) { msg ->
                                 PopupBubbleItem(msg = msg)
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // 3. Quick Response Preset Chips Row
+                // 3. Quick Response Presets
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+                        .padding(vertical = 2.dp)
                 ) {
                     val presets = if (quickResponses.isNotEmpty()) quickResponses.map { it.text } else listOf(
                         "OK 👍",
@@ -465,9 +526,9 @@ fun QuickReplyPopupScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // 4. Quick Reply Input & Dispatch Button
+                // 4. Quick Reply Input Field & Send Action
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -475,14 +536,14 @@ fun QuickReplyPopupScreen(
                     OutlinedTextField(
                         value = replyText,
                         onValueChange = { replyText = it },
-                        placeholder = { Text("Type quick reply...") },
+                        placeholder = { Text("Quick reply...", fontSize = 14.sp) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("quick_reply_input_field"),
                         shape = RoundedCornerShape(20.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
                         ),
                         maxLines = 3
                     )
@@ -493,14 +554,26 @@ fun QuickReplyPopupScreen(
                         onClick = {
                             if (replyText.isNotBlank() && !isSending) {
                                 isSending = true
+                                val textToSend = replyText.trim()
                                 scope.launch {
                                     try {
+                                        // 1. Send SMS via repository
                                         messageRepository.sendMessage(
                                             recipientPhone = senderPhone,
                                             recipientName = senderName,
-                                            content = replyText.trim()
+                                            content = textToSend
                                         )
-                                        Toast.makeText(context, "Reply sent to $displayName", Toast.LENGTH_SHORT).show()
+
+                                        // 2. Clear unread count for conversation
+                                        messageRepository.clearUnreadCount(conversationId)
+
+                                        // 3. Dismiss system notification
+                                        NotificationManagerCompat.from(context).cancel(senderPhone.hashCode())
+
+                                        // 4. Toast confirmation
+                                        Toast.makeText(context, "Reply sent", Toast.LENGTH_SHORT).show()
+
+                                        // 5. Close popup immediately to restore previous app
                                         onDismiss()
                                     } catch (_: Exception) {
                                         Toast.makeText(context, "Failed to send SMS", Toast.LENGTH_SHORT).show()
@@ -511,7 +584,7 @@ fun QuickReplyPopupScreen(
                         },
                         enabled = replyText.isNotBlank() && !isSending,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(
                                 if (replyText.isNotBlank()) MaterialTheme.colorScheme.primary
@@ -522,7 +595,8 @@ fun QuickReplyPopupScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = if (replyText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (replyText.isNotBlank()) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -540,24 +614,25 @@ fun PopupBubbleItem(msg: MessageEntity) {
     ) {
         Surface(
             shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isFromMe) 16.dp else 4.dp,
-                bottomEnd = if (isFromMe) 4.dp else 16.dp
+                topStart = 14.dp,
+                topEnd = 14.dp,
+                bottomStart = if (isFromMe) 14.dp else 4.dp,
+                bottomEnd = if (isFromMe) 4.dp else 14.dp
             ),
             color = if (isFromMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.padding(horizontal = 4.dp)
+            modifier = Modifier.padding(horizontal = 2.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 Text(
                     text = msg.content,
                     style = MaterialTheme.typography.bodyMedium,
+                    fontSize = 14.sp,
                     color = if (isFromMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = TimeFormatter.formatMessageTimestamp(msg.timestamp),
                     style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     color = (if (isFromMe) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = 0.7f),
                     modifier = Modifier.align(Alignment.End)
                 )

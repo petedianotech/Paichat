@@ -16,10 +16,11 @@ import kotlinx.coroutines.launch
 class SmsStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        val uri = intent.data ?: return
-        val messageId = uri.host?.takeIf { it.isNotBlank() }
-            ?: uri.schemeSpecificPart?.removePrefix("//")?.takeIf { it.isNotBlank() }
-            ?: uri.schemeSpecificPart ?: return
+        val uri = intent.data
+        val messageId = intent.getStringExtra("extra_message_id")
+            ?: uri?.host?.takeIf { it.isNotBlank() }
+            ?: uri?.schemeSpecificPart?.removePrefix("//")?.takeIf { it.isNotBlank() }
+            ?: uri?.schemeSpecificPart ?: return
 
         val resultCodeCopy = resultCode
         val pendingResult = goAsync()
@@ -38,6 +39,7 @@ class SmsStatusReceiver : BroadcastReceiver() {
                     }
                     messageDao.updateMessageStatus(messageId, status)
                 } else if (action == "com.example.SMS_DELIVERED") {
+                    // Update status directly to DELIVERED
                     messageDao.updateMessageStatus(messageId, MessageStatus.DELIVERED)
 
                     // Delivery Report Notification if customizable setting is enabled (BOTH or NOTIFICATIONS_ONLY)
@@ -48,6 +50,7 @@ class SmsStatusReceiver : BroadcastReceiver() {
                     if (shouldNotify) {
                         val message = messageDao.getMessageById(messageId)
                         if (message != null) {
+                            // Show silent low-priority delivery confirmation report
                             NotificationHelper.showDeliveryReportNotification(
                                 context = context,
                                 recipientPhone = message.recipientPhoneNumber
