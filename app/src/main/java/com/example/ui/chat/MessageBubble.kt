@@ -36,10 +36,10 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -73,6 +73,11 @@ import coil.request.SuccessResult
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
+import com.example.ui.theme.BubbleReceivedDark
+import com.example.ui.theme.BubbleReceivedLight
+import com.example.ui.theme.BubbleSentDark
+import com.example.ui.theme.BubbleSentLight
+import com.example.ui.theme.StatusDeliveredColor
 import com.example.ui.util.TimeFormatter
 import com.example.ui.util.VoiceNoteHelper
 import kotlinx.coroutines.CoroutineScope
@@ -111,13 +116,13 @@ fun MessageBubble(
     }
 
     val outerRadius = when (bubbleShape) {
-        "PILL" -> 24.dp
+        "PILL" -> 22.dp
         "SQUARE" -> 8.dp
         else -> 18.dp
     }
     val innerRadius = when (bubbleShape) {
-        "PILL" -> 10.dp
-        "SQUARE" -> 4.dp
+        "PILL" -> 8.dp
+        "SQUARE" -> 3.dp
         else -> 4.dp
     }
 
@@ -138,28 +143,24 @@ fun MessageBubble(
     }
 
     val customColor = customColorHex?.let {
-        try {
-            Color(android.graphics.Color.parseColor(it))
-        } catch (_: Exception) {
-            null
-        }
+        try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
     }
 
     val backgroundColor = when {
         isFromMe -> customColor ?: MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)
+        else -> MaterialTheme.colorScheme.surfaceVariant
     }
 
     val contentColor = when {
         isFromMe -> MaterialTheme.colorScheme.onPrimary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurface
     }
 
     val textStyle = when (fontSize) {
-        "SMALL" -> MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp)
-        "LARGE" -> MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp)
-        "EXTRA_LARGE" -> MaterialTheme.typography.bodyLarge.copy(fontSize = 19.sp)
-        else -> MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp)
+        "SMALL" -> MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp)
+        "LARGE" -> MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 23.sp)
+        "EXTRA_LARGE" -> MaterialTheme.typography.bodyLarge.copy(fontSize = 19.sp, lineHeight = 25.sp)
+        else -> MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp)
     }
 
     val isVoiceNote = !message.mediaUrl.isNullOrBlank() &&
@@ -181,7 +182,7 @@ fun MessageBubble(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp),
+            .padding(horizontal = 12.dp, vertical = if (isFirstInGroup) 3.dp else 1.5.dp),
         horizontalAlignment = if (isFromMe) Alignment.End else Alignment.Start
     ) {
         Surface(
@@ -189,10 +190,8 @@ fun MessageBubble(
             color = backgroundColor,
             contentColor = contentColor,
             modifier = Modifier
-                .widthIn(max = 300.dp)
-                .semantics {
-                    contentDescription = accessibilityDescription
-                }
+                .widthIn(max = 310.dp)
+                .semantics { contentDescription = accessibilityDescription }
                 .combinedClickable(
                     onClick = {},
                     onLongClick = onLongClick
@@ -212,10 +211,10 @@ fun MessageBubble(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = if (isFromMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f)
+                            color = if (isFromMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
                             else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clickable {
                                     if (isAudioPlaying) {
                                         VoiceNoteHelper.stopPlayback()
@@ -238,7 +237,7 @@ fun MessageBubble(
                                     imageVector = if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (isAudioPlaying) "Pause" else "Play",
                                     tint = contentColor,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -251,13 +250,14 @@ fun MessageBubble(
                                     imageVector = Icons.Default.Mic,
                                     contentDescription = null,
                                     tint = contentColor.copy(alpha = 0.8f),
-                                    modifier = Modifier.size(14.dp)
+                                    modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
                                     text = if (isAudioPlaying) "Playing voice note..." else "Voice Note",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
                                     color = contentColor
                                 )
                             }
@@ -270,7 +270,7 @@ fun MessageBubble(
                                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val barHeights = listOf(8, 14, 20, 12, 18, 24, 16, 10, 22, 14, 8, 16, 12, 6)
+                                val barHeights = listOf(6, 12, 18, 10, 16, 22, 14, 8, 20, 12, 8, 14, 10, 6)
                                 barHeights.forEachIndexed { i, h ->
                                     val active = isAudioPlaying && (i % 2 == 0)
                                     Box(
@@ -278,7 +278,7 @@ fun MessageBubble(
                                             .weight(1f)
                                             .height((if (active) h + 4 else h).dp)
                                             .clip(RoundedCornerShape(2.dp))
-                                            .background(contentColor.copy(alpha = if (active) 0.95f else 0.5f))
+                                            .background(contentColor.copy(alpha = if (active) 0.95f else 0.45f))
                                     )
                                 }
                             }
@@ -326,7 +326,7 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // 3. Text Content with Partial Selection Container and Search Highlighting
+                // 3. Text Content with Search Highlighting
                 if (message.content.isNotBlank() && (!isPhotoMms || message.content != "Photo attachment") && (!isVoiceNote || message.content != "Voice message")) {
                     SelectionContainer {
                         if (highlightQuery.isNotBlank() && message.content.contains(highlightQuery, ignoreCase = true)) {
@@ -348,7 +348,7 @@ fun MessageBubble(
                                     val matchEnd = index + highlightQuery.length
                                     withStyle(
                                         style = SpanStyle(
-                                            background = Color(0xFFFFD54F),
+                                            background = Color(0xFFFBBF24),
                                             color = Color.Black,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -371,10 +371,10 @@ fun MessageBubble(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                 }
 
-                // 4. Bottom row: MMS Badge + Timestamp + Status tick
+                // 4. Bottom Row: MMS Badge + Timestamp + Status Checkmarks
                 Row(
                     modifier = Modifier.align(Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
@@ -405,34 +405,34 @@ fun MessageBubble(
                         when (message.status) {
                             MessageStatus.SENDING -> {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
+                                    imageVector = Icons.Default.Schedule,
                                     contentDescription = "Sending",
-                                    modifier = Modifier.size(12.dp),
+                                    modifier = Modifier.size(11.dp),
                                     tint = contentColor.copy(alpha = 0.6f)
                                 )
                             }
                             MessageStatus.SENT -> {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "Sent (1 mark)",
+                                    contentDescription = "Sent",
                                     modifier = Modifier.size(12.dp),
-                                    tint = contentColor
+                                    tint = contentColor.copy(alpha = 0.85f)
                                 )
                             }
                             MessageStatus.DELIVERED, MessageStatus.READ -> {
                                 if (showDeliveryMarks) {
                                     Icon(
                                         imageVector = Icons.Default.DoneAll,
-                                        contentDescription = "Delivered (2 marks)",
+                                        contentDescription = "Delivered",
                                         modifier = Modifier.size(14.dp),
-                                        tint = contentColor
+                                        tint = if (isFromMe) StatusDeliveredColor else contentColor
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Sent",
                                         modifier = Modifier.size(12.dp),
-                                        tint = contentColor
+                                        tint = contentColor.copy(alpha = 0.85f)
                                     )
                                 }
                             }
@@ -448,7 +448,7 @@ fun MessageBubble(
                                 Icon(
                                     imageVector = Icons.Default.Error,
                                     contentDescription = "Cancelled",
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(13.dp),
                                     tint = contentColor.copy(alpha = 0.5f)
                                 )
                             }
@@ -458,7 +458,7 @@ fun MessageBubble(
             }
         }
 
-        // Display Emoji Reaction if attached
+        // Emoji Reaction pill
         if (!reactionEmoji.isNullOrBlank()) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -470,19 +470,19 @@ fun MessageBubble(
                 Text(
                     text = reactionEmoji,
                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontSize = 14.sp
+                    fontSize = 13.sp
                 )
             }
         }
 
-        // Retry prompt if SMS failed to send
+        // Retry prompt if message failed to send
         if (isFromMe && message.status == MessageStatus.FAILED) {
             OutlinedButton(
                 onClick = onRetryClick,
                 modifier = Modifier
                     .padding(top = 4.dp)
                     .testTag("retry_message_button"),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error
                 )
@@ -490,7 +490,7 @@ fun MessageBubble(
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(13.dp)
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Failed to send. Tap to retry", style = MaterialTheme.typography.labelSmall)
@@ -504,7 +504,9 @@ fun MessageBubble(
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -524,13 +526,19 @@ fun MessageBubble(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        OutlinedButton(onClick = { showFullImageDialog = false }) {
+                        OutlinedButton(
+                            onClick = { showFullImageDialog = false },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
                             Text("Close")
                         }
-                        Button(onClick = {
-                            saveImageToGallery(context, message.mediaUrl)
-                            showFullImageDialog = false
-                        }) {
+                        Button(
+                            onClick = {
+                                saveImageToGallery(context, message.mediaUrl)
+                                showFullImageDialog = false
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
                             Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Save to Gallery")
@@ -561,7 +569,7 @@ private fun saveImageToGallery(context: Context, imageUrl: String) {
                     val contentValues = ContentValues().apply {
                         put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
                         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PulseChat")
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PaiChat")
                     }
                     val imageUri: Uri? = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
                     fos = imageUri?.let { context.contentResolver.openOutputStream(it) }
@@ -572,14 +580,14 @@ private fun saveImageToGallery(context: Context, imageUrl: String) {
                 }
 
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Saved photo to Pictures/PulseChat", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Saved photo to Pictures/PaiChat", Toast.LENGTH_SHORT).show()
                 }
             } else {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Saved image attachment", Toast.LENGTH_SHORT).show()
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Saved image attachment", Toast.LENGTH_SHORT).show()
             }
