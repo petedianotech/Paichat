@@ -33,7 +33,8 @@ data class AppSettings(
     val userAvatarColor: String = "#005AC1",
     val userStatus: String = "SMS Messenger • Fast & Secure",
     val lastSmsSyncTimestamp: Long = 0L,
-    val defaultChatWallpaper: String = "NONE"
+    val defaultChatWallpaper: String = "NONE",
+    val mmsImageCompressionQuality: String = "NORMAL"
 )
 
 class UserPreferences(context: Context) {
@@ -87,6 +88,7 @@ class UserPreferences(context: Context) {
             val uStatus = prefs.getString("user_status", "SMS Messenger • Fast & Secure") ?: "SMS Messenger • Fast & Secure"
             val lastSync = prefs.getLong("last_sms_sync_timestamp", 0L)
             val wallpaper = prefs.getString("default_chat_wallpaper", "NONE") ?: "NONE"
+            val mmsQuality = prefs.getString("mms_image_compression_quality", "NORMAL") ?: "NORMAL"
 
             return AppSettings(
                 isOnboarded = onboarded,
@@ -113,7 +115,8 @@ class UserPreferences(context: Context) {
                 userAvatarColor = uAvatarColor,
                 userStatus = uStatus,
                 lastSmsSyncTimestamp = lastSync,
-                defaultChatWallpaper = wallpaper
+                defaultChatWallpaper = wallpaper,
+                mmsImageCompressionQuality = mmsQuality
             )
         }
     }
@@ -250,6 +253,11 @@ class UserPreferences(context: Context) {
     fun setDefaultChatWallpaper(wallpaper: String) {
         prefs.edit().putString("default_chat_wallpaper", wallpaper).apply()
         _appSettings.value = _appSettings.value.copy(defaultChatWallpaper = wallpaper)
+    }
+
+    fun setMmsImageCompressionQuality(quality: String) {
+        prefs.edit().putString("mms_image_compression_quality", quality).apply()
+        _appSettings.value = _appSettings.value.copy(mmsImageCompressionQuality = quality)
     }
 
     // Per-conversation Notification Controls (Mute / Unmute)
