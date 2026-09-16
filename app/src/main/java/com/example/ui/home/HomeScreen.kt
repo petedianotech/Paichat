@@ -402,7 +402,7 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier
                                 .size(64.dp)
-                                .clip(CircleShape)
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
