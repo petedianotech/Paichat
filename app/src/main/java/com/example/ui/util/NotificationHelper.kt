@@ -162,6 +162,27 @@ object NotificationHelper {
             .setLights(android.graphics.Color.CYAN, 1000, 1000)
             .setVibrate(vibrationWave)
 
+        // Set Contact Photo as Large Icon if available
+        try {
+            val contactRepo = com.example.data.repository.ContactRepository()
+            val photoUriStr = contactRepo.resolveContactPhotoUri(context, senderPhone)
+            if (!photoUriStr.isNullOrBlank()) {
+                val uri = android.net.Uri.parse(photoUriStr)
+                val bitmap: android.graphics.Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+                    android.graphics.ImageDecoder.decodeBitmap(source)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+                if (bitmap != null) {
+                    builder.setLargeIcon(bitmap)
+                }
+            }
+        } catch (_: Exception) {
+            // Ignore if contact photo could not be decoded
+        }
+
         // Enable Android / Samsung Floating Chat Bubble Metadata on Android 11+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {

@@ -47,6 +47,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -66,8 +73,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.local.entity.ConversationEntity
@@ -82,10 +93,23 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val listState = rememberLazyListState()
+
     val conversations by viewModel.conversations.collectAsState()
+    val contactsMap by viewModel.contactsMap.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val currentFilter by viewModel.currentFilter.collectAsState()
     val syncProgress by viewModel.syncProgress.collectAsState()
+    val drafts by viewModel.drafts.collectAsState()
+    val matchedMessages by viewModel.matchedMessages.collectAsState()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (checkAllSmsPermissions(context)) {
+            viewModel.syncSmsAndContacts(context)
+        }
+    }
 
     var selectedConversationForMenu by remember { mutableStateOf<ConversationEntity?>(null) }
     var conversationToDelete by remember { mutableStateOf<ConversationEntity?>(null) }
@@ -96,12 +120,14 @@ fun HomeScreen(
     val pinnedConversations = conversations.filter { it.isPinned }
     val regularConversations = conversations.filter { !it.isPinned }
     val totalUnread = conversations.sumOf { it.unreadCount }
+    val draftsCount = drafts.values.count { it.isNotBlank() }
 
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .imePadding(),
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column(
                 modifier = Modifier
@@ -111,7 +137,7 @@ fun HomeScreen(
             ) {
                 // 1. Google Messages / Textra style integrated Search & Profile Bar
                 Surface(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(26.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -260,6 +286,26 @@ fun HomeScreen(
                             )
                         )
                     }
+
+                    if (draftsCount > 0) {
+                        FilterChip(
+                            selected = currentFilter == HomeFilter.DRAFTS,
+                            onClick = { viewModel.setFilter(HomeFilter.DRAFTS) },
+                            label = {
+                                Text(
+                                    text = "Drafts ($draftsCount)",
+                                    fontSize = 13.sp,
+                                    fontWeight = if (currentFilter == HomeFilter.DRAFTS) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                selectedContainerColor = MaterialTheme.colorScheme.error,
+                                selectedLabelColor = MaterialTheme.colorScheme.onError
+                            )
+                        )
+                    }
                 }
 
                 // 3. SMS Syncing / Importing Progress Indicator
@@ -268,7 +314,7 @@ fun HomeScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 4.dp, bottom = 4.dp),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
@@ -319,50 +365,16 @@ fun HomeScreen(
             }
         },
         floatingActionButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Floating Quick Reply Launcher Shortcut
-                if (conversations.isNotEmpty()) {
-                    val latestConv = conversations.first()
-                    FloatingActionButton(
-                        onClick = {
-                            val popupIntent = Intent(context, com.example.ui.quickreply.QuickReplyActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                                putExtra("conversationId", latestConv.conversationId)
-                                putExtra("senderPhone", latestConv.phoneNumber)
-                                putExtra("senderName", latestConv.contactName)
-                                putExtra("initialMessage", latestConv.lastMessage)
-                            }
-                            context.startActivity(popupIntent)
-                        },
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        shape = CircleShape,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("floating_quick_reply_bubble_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChatBubbleOutline,
-                            contentDescription = "Floating Quick Reply",
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // Primary Start Chat Action
-                ExtendedFloatingActionButton(
-                    onClick = onNavigateToNewChat,
-                    icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                    text = { Text("Start chat", fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.testTag("start_chat_fab")
-                )
-            }
+            // Primary Start Chat Action
+            ExtendedFloatingActionButton(
+                onClick = onNavigateToNewChat,
+                icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                text = { Text("Start chat", fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape,
+                modifier = Modifier.testTag("start_chat_fab")
+            )
         }
     ) { paddingValues ->
         Column(
@@ -403,14 +415,22 @@ fun HomeScreen(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (searchQuery.isNotBlank()) "No messages match your search" else "No conversations yet",
+                            text = when {
+                                syncProgress.isSyncing -> "Loading conversations..."
+                                searchQuery.isNotBlank() -> "No messages match your search"
+                                else -> "No conversations yet"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = if (searchQuery.isNotBlank()) "Try searching for a different name or number" else "Tap 'Start chat' to send an SMS to any contact or phone number.",
+                            text = when {
+                                syncProgress.isSyncing -> "Retrieving your messages securely from device storage."
+                                searchQuery.isNotBlank() -> "Try searching for a different name or number"
+                                else -> "Tap 'Start chat' to send an SMS to any contact or phone number."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -419,62 +439,237 @@ fun HomeScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
-                    if (pinnedConversations.isNotEmpty()) {
-                        item {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PushPin,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(13.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
+                    if (searchQuery.isNotBlank()) {
+                        // SEARCH MODE
+                        if (conversations.isNotEmpty()) {
+                            item {
                                 Text(
-                                    text = "PINNED",
+                                    text = "CONVERSATIONS (${conversations.size})",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    letterSpacing = 0.5.sp
+                                    letterSpacing = 0.5.sp,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp)
                                 )
+                            }
+
+                            items(
+                                items = conversations,
+                                key = { "search_conv_${it.conversationId}" }
+                            ) { conversation ->
+                                val photoUri = contactsMap[conversation.phoneNumber]?.photoUri 
+                                    ?: viewModel.getPhotoUriForPhone(conversation.phoneNumber)
+                                ConversationItem(
+                                    conversation = conversation,
+                                    photoUri = photoUri,
+                                    draftText = drafts[conversation.conversationId],
+                                    onClick = { onNavigateToChat(conversation.conversationId) },
+                                    onLongClick = { selectedConversationForMenu = conversation }
+                                )
+                            }
+                        }
+
+                        if (matchedMessages.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "MESSAGES (${matchedMessages.size})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 0.5.sp,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 4.dp)
+                                )
+                            }
+
+                            items(
+                                items = matchedMessages,
+                                key = { "search_msg_${it.messageId}" }
+                            ) { message ->
+                                val contact = contactsMap[message.conversationId]
+                                val displayName = contact?.name ?: message.senderPhoneNumber.ifBlank { message.recipientPhoneNumber }
+
+                                Surface(
+                                    onClick = { onNavigateToChat(message.conversationId) },
+                                    color = MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = displayName,
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = com.example.ui.util.TimeFormatter.formatMessageTimestamp(message.timestamp),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        val content = message.content
+                                        val isFromMe = message.senderPhoneNumber == "ME"
+                                        val queryLower = searchQuery.lowercase()
+                                        val textLower = content.lowercase()
+                                        val annotated = buildAnnotatedString {
+                                            if (isFromMe) {
+                                                withStyle(
+                                                    SpanStyle(
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                ) {
+                                                    append("You: ")
+                                                }
+                                            }
+                                            var startIndex = 0
+                                            while (startIndex < content.length) {
+                                                val matchIndex = textLower.indexOf(queryLower, startIndex)
+                                                if (matchIndex == -1) {
+                                                    append(content.substring(startIndex))
+                                                    break
+                                                }
+                                                if (matchIndex > startIndex) {
+                                                    append(content.substring(startIndex, matchIndex))
+                                                }
+                                                withStyle(
+                                                    SpanStyle(
+                                                        background = MaterialTheme.colorScheme.primaryContainer,
+                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                        fontWeight = FontWeight.Bold
+                                                    )
+                                                ) {
+                                                    append(content.substring(matchIndex, matchIndex + queryLower.length))
+                                                }
+                                                startIndex = matchIndex + queryLower.length
+                                            }
+                                        }
+                                        Text(
+                                            text = annotated,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                                )
+                            }
+                        }
+                    } else {
+                        // STANDARD CONVERSATION LIST WITH PINNED & SWIPE ACTIONS
+                        if (pinnedConversations.isNotEmpty()) {
+                            item {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PushPin,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "PINNED",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+
+                            items(
+                                items = pinnedConversations,
+                                key = { it.conversationId }
+                            ) { conversation ->
+                                val photoUri = contactsMap[conversation.phoneNumber]?.photoUri 
+                                    ?: viewModel.getPhotoUriForPhone(conversation.phoneNumber)
+                                SwipeableConversationItem(
+                                    conversation = conversation,
+                                    photoUri = photoUri,
+                                    draftText = drafts[conversation.conversationId],
+                                    onClick = { onNavigateToChat(conversation.conversationId) },
+                                    onLongClick = { selectedConversationForMenu = conversation },
+                                    onToggleRead = {
+                                        viewModel.markAsReadOrUnread(conversation.conversationId, conversation.unreadCount)
+                                    },
+                                    onDelete = {
+                                        viewModel.deleteConversationWithUndo(conversation.conversationId) { restoreAction ->
+                                            coroutineScope.launch {
+                                                val result = snackbarHostState.showSnackbar(
+                                                    message = "Conversation deleted",
+                                                    actionLabel = "UNDO",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) {
+                                                    restoreAction()
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+
+                            if (regularConversations.isNotEmpty()) {
+                                item {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                    )
+                                }
                             }
                         }
 
                         items(
-                            items = pinnedConversations,
+                            items = regularConversations,
                             key = { it.conversationId }
                         ) { conversation ->
-                            ConversationItem(
+                            val photoUri = contactsMap[conversation.phoneNumber]?.photoUri 
+                                ?: viewModel.getPhotoUriForPhone(conversation.phoneNumber)
+                            SwipeableConversationItem(
                                 conversation = conversation,
+                                photoUri = photoUri,
+                                draftText = drafts[conversation.conversationId],
                                 onClick = { onNavigateToChat(conversation.conversationId) },
-                                onLongClick = { selectedConversationForMenu = conversation }
+                                onLongClick = { selectedConversationForMenu = conversation },
+                                onToggleRead = {
+                                    viewModel.markAsReadOrUnread(conversation.conversationId, conversation.unreadCount)
+                                },
+                                onDelete = {
+                                    viewModel.deleteConversationWithUndo(conversation.conversationId) { restoreAction ->
+                                        coroutineScope.launch {
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = "Conversation deleted",
+                                                actionLabel = "UNDO",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                restoreAction()
+                                            }
+                                        }
+                                    }
+                                }
                             )
                         }
-
-                        if (regularConversations.isNotEmpty()) {
-                            item {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-                            }
-                        }
-                    }
-
-                    items(
-                        items = regularConversations,
-                        key = { it.conversationId }
-                    ) { conversation ->
-                        ConversationItem(
-                            conversation = conversation,
-                            onClick = { onNavigateToChat(conversation.conversationId) },
-                            onLongClick = { selectedConversationForMenu = conversation }
-                        )
                     }
                 }
             }
@@ -495,7 +690,7 @@ fun HomeScreen(
                         placeholder = { Text("e.g. +1 555-0199") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
                     OutlinedTextField(
                         value = quickComposeText,
@@ -504,7 +699,7 @@ fun HomeScreen(
                         placeholder = { Text("Type SMS text...") },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 4,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
                 }
             },
@@ -520,7 +715,7 @@ fun HomeScreen(
                             quickComposeText = ""
                         }
                     },
-                    shape = RoundedCornerShape(12.dp)
+                    shape = CircleShape
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))

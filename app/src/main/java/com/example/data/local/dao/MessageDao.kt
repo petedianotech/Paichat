@@ -40,6 +40,18 @@ interface MessageDao {
         limit: Int
     ): Flow<List<MessageEntity>>
 
+    @Query("""
+        SELECT * FROM messages 
+        WHERE conversationId = :conversationId 
+           OR conversationId = :normalizedId
+           OR recipientPhoneNumber = :conversationId
+           OR recipientPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :conversationId
+           OR senderPhoneNumber = :normalizedId
+        ORDER BY timestamp ASC
+    """)
+    suspend fun getMessagesForConversationFlexibleDirect(conversationId: String, normalizedId: String): List<MessageEntity>
+
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
     fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>>
 
@@ -72,6 +84,9 @@ interface MessageDao {
 
     @Update
     suspend fun updateMessage(message: MessageEntity)
+
+    @Query("SELECT * FROM messages WHERE content LIKE '%' || :query || '%' ORDER BY timestamp DESC LIMIT 50")
+    fun searchMessages(query: String): Flow<List<MessageEntity>>
 
     @Query("DELETE FROM messages WHERE messageId = :messageId")
     suspend fun deleteMessageById(messageId: String)

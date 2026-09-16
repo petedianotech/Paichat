@@ -4,23 +4,28 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.ConversationEntity
+import com.example.data.local.entity.MessageEntity
 import com.example.data.model.SyncProgress
 import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
+import com.example.ui.util.DraftManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class HomeFilter {
     ALL,
     UNREAD,
-    PINNED
+    PINNED,
+    DRAFTS
 }
 
 class HomeViewModel(
@@ -31,6 +36,8 @@ class HomeViewModel(
 
     val appSettings: StateFlow<AppSettings> = userPreferences.appSettings
     val syncProgress: StateFlow<SyncProgress> = messageRepository.syncProgress
+    val contactsMap = contactRepository.contactsMap
+    val drafts = DraftManager.drafts
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -41,8 +48,9 @@ class HomeViewModel(
     val conversations: StateFlow<List<ConversationEntity>> = combine(
         messageRepository.getAllConversations(),
         _searchQuery,
-        _currentFilter
-    ) { list, query, filter ->
+        _currentFilter,
+        drafts
+    ) { list, query, filter, draftMap ->
         val queryFiltered = if (query.isBlank()) {
             list
         } else {
@@ -57,12 +65,30 @@ class HomeViewModel(
             HomeFilter.ALL -> queryFiltered
             HomeFilter.UNREAD -> queryFiltered.filter { it.unreadCount > 0 }
             HomeFilter.PINNED -> queryFiltered.filter { it.isPinned }
+            HomeFilter.DRAFTS -> queryFiltered.filter { !draftMap[it.conversationId].isNullOrBlank() }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = emptyList()
+    )
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val matchedMessages: StateFlow<List<MessageEntity>> = _searchQuery.flatMapLatest { query ->
+        if (query.trim().length >= 2) {
+            messageRepository.searchMessages(query.trim())
+        } else {
+            flowOf(emptyList())
         }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    fun getPhotoUriForPhone(phoneNumber: String): String? {
+        return contactRepository.getPhotoUriForPhoneNumber(phoneNumber)
+    }
 
     init {
         // Automatically check for due scheduled messages on launch
@@ -125,6 +151,22 @@ class HomeViewModel(
     fun deleteConversation(conversationId: String) {
         viewModelScope.launch {
             messageRepository.deleteConversation(conversationId)
+        }
+    }
+
+    fun deleteConversationWithUndo(conversationId: String, onUndoAvailable: (() -> Unit) -> Unit) {
+        viewModelScope.launch {
+            val conv = messageRepository.getConversationDirect(conversationId)
+            val msgs = messageRepository.getMessagesDirect(conversationId)
+            messageRepository.deleteConversation(conversationId)
+
+            if (conv != null) {
+                onUndoAvailable {
+                    viewModelScope.launch {
+                        messageRepository.restoreConversationAndMessages(conv, msgs)
+                    }
+                }
+            }
         }
     }
 }

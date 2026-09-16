@@ -20,11 +20,6 @@ data class AppSettings(
     val vibrateOnSend: Boolean = true,
     val showCharacterCounter: Boolean = true,
     val selectedSimSlot: Int = 0, // 0 = SIM 1, 1 = SIM 2
-    // Textra-grade MMS & Media settings
-    val mmsSizeLimit: String = "1MB", // 300KB, 600KB, 1MB, 2MB
-    val mmsImageCompressionQuality: String = "HIGH", // HIGH, MEDIUM, LOW
-    val autoDownloadMms: String = "ALWAYS", // ALWAYS, WIFI_ONLY, NEVER
-    val autoSavePhotos: Boolean = false,
     // Notification & Quick Reply settings
     val notificationSound: Boolean = true,
     val notificationVibratePattern: String = "NORMAL", // NORMAL, SHORT, LONG, OFF
@@ -80,11 +75,6 @@ class UserPreferences(context: Context) {
             val vibrate = prefs.getBoolean("vibrate_on_send", true)
             val charCounter = prefs.getBoolean("show_char_counter", true)
             val simSlot = prefs.getInt("selected_sim_slot", 0)
-
-            val mmsSize = prefs.getString("mms_size_limit", "1MB") ?: "1MB"
-            val mmsQuality = prefs.getString("mms_image_compression_quality", "HIGH") ?: "HIGH"
-            val autoMms = prefs.getString("auto_download_mms", "ALWAYS") ?: "ALWAYS"
-            val autoSave = prefs.getBoolean("auto_save_photos", false)
             val notifSound = prefs.getBoolean("notification_sound", true)
             val notifVib = prefs.getString("notification_vibrate_pattern", "NORMAL") ?: "NORMAL"
             val quickReply = prefs.getBoolean("quick_reply_popup", true)
@@ -112,10 +102,6 @@ class UserPreferences(context: Context) {
                 vibrateOnSend = vibrate,
                 showCharacterCounter = charCounter,
                 selectedSimSlot = simSlot,
-                mmsSizeLimit = mmsSize,
-                mmsImageCompressionQuality = mmsQuality,
-                autoDownloadMms = autoMms,
-                autoSavePhotos = autoSave,
                 notificationSound = notifSound,
                 notificationVibratePattern = notifVib,
                 quickReplyPopup = quickReply,
@@ -206,26 +192,6 @@ class UserPreferences(context: Context) {
         _appSettings.value = _appSettings.value.copy(selectedSimSlot = slot)
     }
 
-    fun setMmsSizeLimit(limit: String) {
-        prefs.edit().putString("mms_size_limit", limit).apply()
-        _appSettings.value = _appSettings.value.copy(mmsSizeLimit = limit)
-    }
-
-    fun setMmsImageCompressionQuality(quality: String) {
-        prefs.edit().putString("mms_image_compression_quality", quality).apply()
-        _appSettings.value = _appSettings.value.copy(mmsImageCompressionQuality = quality)
-    }
-
-    fun setAutoDownloadMms(mode: String) {
-        prefs.edit().putString("auto_download_mms", mode).apply()
-        _appSettings.value = _appSettings.value.copy(autoDownloadMms = mode)
-    }
-
-    fun setAutoSavePhotos(enabled: Boolean) {
-        prefs.edit().putBoolean("auto_save_photos", enabled).apply()
-        _appSettings.value = _appSettings.value.copy(autoSavePhotos = enabled)
-    }
-
     fun setNotificationSound(enabled: Boolean) {
         prefs.edit().putBoolean("notification_sound", enabled).apply()
         _appSettings.value = _appSettings.value.copy(notificationSound = enabled)
@@ -284,5 +250,35 @@ class UserPreferences(context: Context) {
     fun setDefaultChatWallpaper(wallpaper: String) {
         prefs.edit().putString("default_chat_wallpaper", wallpaper).apply()
         _appSettings.value = _appSettings.value.copy(defaultChatWallpaper = wallpaper)
+    }
+
+    // Per-conversation Notification Controls (Mute / Unmute)
+    fun isConversationMuted(conversationId: String): Boolean {
+        val set = prefs.getStringSet("muted_conversations", emptySet()) ?: emptySet()
+        return set.contains(conversationId)
+    }
+
+    fun setConversationMuted(conversationId: String, muted: Boolean) {
+        val currentSet = prefs.getStringSet("muted_conversations", emptySet())?.toMutableSet() ?: mutableSetOf()
+        if (muted) {
+            currentSet.add(conversationId)
+        } else {
+            currentSet.remove(conversationId)
+        }
+        prefs.edit().putStringSet("muted_conversations", currentSet).apply()
+    }
+
+    fun getMutedConversations(): Set<String> {
+        return prefs.getStringSet("muted_conversations", emptySet()) ?: emptySet()
+    }
+
+    // Per-conversation Dual-SIM preference
+    fun getPreferredSimForConversation(conversationId: String): Int? {
+        if (!prefs.contains("preferred_sim_$conversationId")) return null
+        return prefs.getInt("preferred_sim_$conversationId", 0)
+    }
+
+    fun setPreferredSimForConversation(conversationId: String, simSlot: Int) {
+        prefs.edit().putInt("preferred_sim_$conversationId", simSlot).apply()
     }
 }

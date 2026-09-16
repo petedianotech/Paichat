@@ -38,9 +38,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -78,15 +81,20 @@ import com.example.data.local.entity.MessageEntity
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
+import com.example.ui.components.ContactAvatar
 import com.example.ui.theme.PaiChatTheme
+import com.example.ui.util.AvatarUtil
 import com.example.ui.util.TimeFormatter
 import kotlinx.coroutines.launch
 
 /**
  * Textra-style Preview & Quick Reply Floating Overlay Activity.
  * Runs in an isolated task (taskAffinity="com.example.quickreply", excludeFromRecents=true).
- * When closed, it immediately finishes and reveals whatever app was underneath (YouTube, Browser, etc.)
- * without bringing the main messaging app to the foreground.
+ * When dismissed, it finishes immediately and returns to whatever app was underneath (YouTube, Browser, etc.)
+ * without bringing the main messaging activity to the foreground.
+ *
+ * NOTE: Dismissing or tapping outside does NOT dismiss the system notification from the shade.
+ * The unread notification persists until explicitly replied to, marked as read, or swiped away.
  */
 class QuickReplyActivity : ComponentActivity() {
 
@@ -145,8 +153,19 @@ class QuickReplyActivity : ComponentActivity() {
                     senderName = activeSenderName,
                     initialMessage = activeInitialMessage,
                     messageRepository = messageRepository,
+                    contactRepository = contactRepository,
                     userPreferences = userPreferences,
                     onDismiss = { dismissAndClose() },
+                    onMarkRead = {
+                        val phone = activeSenderPhone
+                        val convId = activeConversationId
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            messageRepository.clearUnreadCount(convId)
+                            NotificationManagerCompat.from(applicationContext).cancel(phone.hashCode())
+                        }
+                        Toast.makeText(applicationContext, "Marked as read", Toast.LENGTH_SHORT).show()
+                        dismissAndClose()
+                    },
                     onOpenFullChat = {
                         val openIntent = Intent(this, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -200,8 +219,10 @@ fun QuickReplyPopupScreen(
     senderName: String?,
     initialMessage: String,
     messageRepository: MessageRepository,
+    contactRepository: ContactRepository,
     userPreferences: UserPreferences,
     onDismiss: () -> Unit,
+    onMarkRead: () -> Unit,
     onOpenFullChat: () -> Unit
 ) {
     val context = LocalContext.current
@@ -209,6 +230,10 @@ fun QuickReplyPopupScreen(
     var replyText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
     var showSizeMenu by remember { mutableStateOf(false) }
+
+    val contactPhotoUri = remember(senderPhone) {
+        contactRepository.resolveContactPhotoUri(context, senderPhone)
+    }
 
     val appSettings by userPreferences.appSettings.collectAsState()
     val messages by messageRepository.getMessagesForConversationPaged(conversationId, 25)
@@ -221,9 +246,9 @@ fun QuickReplyPopupScreen(
 
     // Dynamic Preview Sizing based on user preference
     val (widthFraction, heightFraction) = when (appSettings.popupPreviewSize) {
-        "COMPACT" -> Pair(0.86f, 0.52f)
-        "LARGE" -> Pair(0.96f, 0.86f)
-        else -> Pair(0.92f, 0.70f) // STANDARD
+        "COMPACT" -> Pair(0.88f, 0.50f)
+        "LARGE" -> Pair(0.96f, 0.84f)
+        else -> Pair(0.92f, 0.68f) // STANDARD
     }
 
     // Check system overlay permission ("Appear on top of other apps")
@@ -248,12 +273,13 @@ fun QuickReplyPopupScreen(
     }
 
     val displayName = senderName ?: senderPhone
+    val avatarBgColor = remember(displayName) { AvatarUtil.getAvatarColor(displayName) }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
-            .background(Color.Black.copy(alpha = 0.50f))
+            .background(Color.Black.copy(alpha = 0.55f))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -267,13 +293,13 @@ fun QuickReplyPopupScreen(
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
-                ) { /* Intercept tap on the card body */ }
+                ) { /* Intercept tap on card body so it doesn't dismiss */ }
                 .testTag("quick_reply_popup_card"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -290,20 +316,12 @@ fun QuickReplyPopupScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = displayName.take(1).uppercase(),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        ContactAvatar(
+                            photoUri = contactPhotoUri,
+                            name = displayName,
+                            phoneNumber = senderPhone,
+                            size = 40.dp
+                        )
 
                         Spacer(modifier = Modifier.width(10.dp))
 
@@ -311,7 +329,7 @@ fun QuickReplyPopupScreen(
                             Text(
                                 text = displayName,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1
                             )
@@ -324,7 +342,23 @@ fun QuickReplyPopupScreen(
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        // Mark Read Action
+                        IconButton(
+                            onClick = onMarkRead,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DoneAll,
+                                contentDescription = "Mark as read",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
                         // Size Selection Dropdown Button
                         Box {
                             IconButton(
@@ -334,7 +368,7 @@ fun QuickReplyPopupScreen(
                                 Icon(
                                     imageVector = Icons.Default.AspectRatio,
                                     contentDescription = "Change Preview Size",
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -344,6 +378,9 @@ fun QuickReplyPopupScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Compact Preview") },
+                                    trailingIcon = if (appSettings.popupPreviewSize == "COMPACT") {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
                                     onClick = {
                                         userPreferences.setPopupPreviewSize("COMPACT")
                                         showSizeMenu = false
@@ -351,6 +388,9 @@ fun QuickReplyPopupScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Standard Preview") },
+                                    trailingIcon = if (appSettings.popupPreviewSize == "STANDARD") {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
                                     onClick = {
                                         userPreferences.setPopupPreviewSize("STANDARD")
                                         showSizeMenu = false
@@ -358,6 +398,9 @@ fun QuickReplyPopupScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Large Preview") },
+                                    trailingIcon = if (appSettings.popupPreviewSize == "LARGE") {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null,
                                     onClick = {
                                         userPreferences.setPopupPreviewSize("LARGE")
                                         showSizeMenu = false
@@ -366,6 +409,7 @@ fun QuickReplyPopupScreen(
                             }
                         }
 
+                        // Open Full App Chat Action
                         IconButton(
                             onClick = onOpenFullChat,
                             modifier = Modifier.size(36.dp)
@@ -373,18 +417,19 @@ fun QuickReplyPopupScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = "Open full chat",
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
 
+                        // Dismiss/Close popup
                         IconButton(
                             onClick = onDismiss,
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Close",
+                                contentDescription = "Dismiss popup",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -446,9 +491,9 @@ fun QuickReplyPopupScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // 2. Scrollable Message Thread Preview
                 Box(
@@ -470,7 +515,7 @@ fun QuickReplyPopupScreen(
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                     modifier = Modifier.padding(6.dp)
                                 ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
                                         Text(
                                             text = initialMessage,
                                             style = MaterialTheme.typography.bodyMedium,
@@ -521,7 +566,10 @@ fun QuickReplyPopupScreen(
                                 replyText = preset
                             },
                             label = { Text(preset, fontSize = 12.sp) },
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
                         )
                     }
                 }
@@ -540,10 +588,12 @@ fun QuickReplyPopupScreen(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("quick_reply_input_field"),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(22.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f),
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         ),
                         maxLines = 3
                     )
@@ -567,7 +617,7 @@ fun QuickReplyPopupScreen(
                                         // 2. Clear unread count for conversation
                                         messageRepository.clearUnreadCount(conversationId)
 
-                                        // 3. Dismiss system notification
+                                        // 3. Dismiss system notification from shade since user responded
                                         NotificationManagerCompat.from(context).cancel(senderPhone.hashCode())
 
                                         // 4. Toast confirmation
@@ -622,7 +672,7 @@ fun PopupBubbleItem(msg: MessageEntity) {
             color = if (isFromMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.padding(horizontal = 2.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
                 Text(
                     text = msg.content,
                     style = MaterialTheme.typography.bodyMedium,

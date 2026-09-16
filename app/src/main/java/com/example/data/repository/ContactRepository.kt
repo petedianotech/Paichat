@@ -26,6 +26,9 @@ class ContactRepository {
     private val _registeredContacts = MutableStateFlow<List<Contact>>(emptyList())
     val registeredContacts: StateFlow<List<Contact>> = _registeredContacts.asStateFlow()
 
+    private val _contactsMap = MutableStateFlow<Map<String, Contact>>(emptyMap())
+    val contactsMap: StateFlow<Map<String, Contact>> = _contactsMap.asStateFlow()
+
     fun getContactByPhoneNumber(phoneNumber: String): Contact? {
         val normalized = normalizePhoneNumber(phoneNumber)
         if (normalized.isBlank()) return null
@@ -43,11 +46,68 @@ class ContactRepository {
         return null
     }
 
+    private val photoUriCache = ConcurrentHashMap<String, String>()
+
+    fun getPhotoUriForPhoneNumber(phoneNumber: String): String? {
+        val normalized = normalizePhoneNumber(phoneNumber)
+        photoUriCache[normalized]?.let { return it }
+        val contactPhoto = getContactByPhoneNumber(phoneNumber)?.photoUri
+        if (contactPhoto != null) {
+            photoUriCache[normalized] = contactPhoto
+            return contactPhoto
+        }
+        return null
+    }
+
+    /**
+     * Efficiently resolves a contact's photo thumbnail on-demand using Contacts Provider
+     * with memory caching to prevent repeated queries.
+     */
+    fun resolveContactPhotoUri(context: Context, phoneNumber: String): String? {
+        val normalized = normalizePhoneNumber(phoneNumber)
+        if (normalized.isBlank()) return null
+        photoUriCache[normalized]?.let { return it }
+
+        val cached = getContactByPhoneNumber(phoneNumber)?.photoUri
+        if (cached != null) {
+            photoUriCache[normalized] = cached
+            return cached
+        }
+
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+
+        try {
+            val uri = android.net.Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                android.net.Uri.encode(phoneNumber)
+            )
+            val projection = arrayOf(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val photoIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+                    if (photoIndex >= 0) {
+                        val photoUri = cursor.getString(photoIndex)
+                        if (!photoUri.isNullOrBlank()) {
+                            photoUriCache[normalized] = photoUri
+                            return photoUri
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Ignore safe lookup errors
+        }
+        return null
+    }
+
     fun addOrUpdateContact(contact: Contact) {
         val normalized = normalizePhoneNumber(contact.phoneNumber)
         if (normalized.isNotBlank()) {
             contactsByNormalizedNumber[normalized] = contact
             _registeredContacts.value = contactsByNormalizedNumber.values.sortedBy { it.name }
+            _contactsMap.value = contactsByNormalizedNumber.toMap()
         }
     }
 
@@ -103,6 +163,7 @@ class ContactRepository {
 
             contactsByNormalizedNumber.putAll(tempMap)
             _registeredContacts.value = contactsByNormalizedNumber.values.sortedBy { it.name }
+            _contactsMap.value = contactsByNormalizedNumber.toMap()
         } catch (e: Exception) {
             e.printStackTrace()
         }

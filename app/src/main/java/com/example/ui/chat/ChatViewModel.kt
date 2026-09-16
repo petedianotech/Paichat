@@ -16,6 +16,7 @@ import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
+import com.example.ui.util.DraftManager
 import com.example.ui.util.ImageCompressorHelper
 import com.example.ui.util.SimManagerHelper
 import com.example.ui.util.VoiceNoteHelper
@@ -104,12 +105,26 @@ class ChatViewModel(
 
     private var recordingTimerJob: Job? = null
 
+    private val _isMuted = MutableStateFlow(userPreferences.isConversationMuted(conversationId))
+    val isMuted: StateFlow<Boolean> = _isMuted.asStateFlow()
+
     init {
+        val preferredSim = userPreferences.getPreferredSimForConversation(conversationId)
+        if (preferredSim != null) {
+            _selectedSimIndex.value = preferredSim
+        }
+
         viewModelScope.launch {
             messageRepository.clearUnreadCount(conversationId)
             messageRepository.getConversationById(conversationId).collectLatest {
                 _conversation.value = it
             }
+        }
+
+        // Restore draft if present
+        val savedDraft = DraftManager.getDraft(conversationId)
+        if (savedDraft.isNotBlank()) {
+            _inputText.value = savedDraft
         }
 
         viewModelScope.launch {
@@ -146,15 +161,32 @@ class ChatViewModel(
         }
     }
 
+    fun setConversationSim(slotIndex: Int) {
+        userPreferences.setPreferredSimForConversation(conversationId, slotIndex)
+        selectSim(slotIndex)
+    }
+
     fun cycleNextSim() {
         val sims = _availableSims.value
         if (sims.size > 1) {
-            _selectedSimIndex.value = (_selectedSimIndex.value + 1) % sims.size
+            val nextIndex = (_selectedSimIndex.value + 1) % sims.size
+            setConversationSim(nextIndex)
         }
+    }
+
+    fun toggleMute() {
+        val next = !_isMuted.value
+        userPreferences.setConversationMuted(conversationId, next)
+        _isMuted.value = next
     }
 
     fun updateInputText(text: String) {
         _inputText.value = text
+        if (text.isBlank()) {
+            DraftManager.clearDraft(conversationId)
+        } else {
+            DraftManager.saveDraft(conversationId, text)
+        }
     }
 
     fun appendQuickResponse(text: String) {
@@ -185,6 +217,8 @@ class ChatViewModel(
     fun initiateSendMessage(context: Context, mediaUrl: String? = null) {
         val text = _inputText.value.trim()
         if (text.isEmpty() && mediaUrl == null) return
+
+        DraftManager.clearDraft(conversationId)
 
         val delaySec = appSettings.value.sendDelaySeconds
 
@@ -286,6 +320,8 @@ class ChatViewModel(
         val text = _inputText.value.trim()
         if (text.isEmpty()) return
 
+        DraftManager.clearDraft(conversationId)
+
         val conv = _conversation.value
         val recipientPhone = conv?.phoneNumber ?: conversationId
         val recipientName = conv?.contactName
@@ -363,6 +399,33 @@ class ChatViewModel(
         viewModelScope.launch {
             messageRepository.deleteMessage(messageId)
         }
+    }
+
+    fun deleteMessages(messageIds: Collection<String>) {
+        viewModelScope.launch {
+            messageIds.forEach { id ->
+                messageRepository.deleteMessage(id)
+            }
+        }
+    }
+
+    fun deleteMessagesWithUndo(messageIds: Collection<String>, onUndoAvailable: (() -> Unit) -> Unit) {
+        val targets = _messages.value.filter { it.messageId in messageIds }
+        if (targets.isEmpty()) return
+
+        viewModelScope.launch {
+            messageRepository.deleteMessages(messageIds.toSet())
+            onUndoAvailable {
+                viewModelScope.launch {
+                    messageRepository.restoreMessages(targets)
+                }
+            }
+        }
+    }
+
+    fun getContactPhotoUri(): String? {
+        val conv = _conversation.value ?: return null
+        return contactRepository.getPhotoUriForPhoneNumber(conv.phoneNumber)
     }
 
     fun startVoiceRecording(context: Context) {

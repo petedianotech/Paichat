@@ -18,11 +18,19 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.filled.ContactPage
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material.icons.filled.PermMedia
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.SimCard
+import androidx.compose.material3.RadioButton
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +43,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -62,14 +72,17 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SentimentSatisfiedAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -91,8 +104,10 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -123,11 +138,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Deselect
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.ScheduledMessageEntity
+import com.example.ui.components.ContactAvatar
 import com.example.ui.theme.LocalThemeGradient
 import com.example.ui.util.AvatarUtil
+import com.example.ui.util.PhoneNumberUtil
 import com.example.ui.util.TimeFormatter
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -152,11 +171,16 @@ fun ChatThreadScreen(
     val reactions by viewModel.reactions.collectAsState()
     val appSettings by viewModel.appSettings.collectAsState()
     val delayedSendState by viewModel.delayedSendState.collectAsState()
-    val isRecordingVoice by viewModel.isRecordingVoice.collectAsState()
-    val recordingDurationSec by viewModel.recordingDurationSec.collectAsState()
     val isSearchActive by viewModel.isSearchActive.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val filteredMessages by viewModel.filteredMessages.collectAsState()
+    val isMuted by viewModel.isMuted.collectAsState()
+
+    var showSimPickerDialog by remember { mutableStateOf(false) }
+
+    var selectedMessageIds by remember { mutableStateOf(setOf<String>()) }
+    val isSelectionMode = selectedMessageIds.isNotEmpty()
+    var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
 
     var selectedMessageForAction by remember { mutableStateOf<MessageEntity?>(null) }
     var showMessageInfoDialog by remember { mutableStateOf<MessageEntity?>(null) }
@@ -192,26 +216,6 @@ fun ChatThreadScreen(
     var firstVisibleItemOffset by remember { mutableStateOf(0) }
 
     val emojiList = listOf("❤️", "👍", "😂", "😮", "😢", "🔥")
-
-    // Zero-permission Android Photo Picker for MMS
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            viewModel.sendMediaAttachment(context, uri.toString())
-        }
-    }
-
-    // Audio recording permission launcher
-    val audioPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            viewModel.startVoiceRecording(context)
-        } else {
-            Toast.makeText(context, "Microphone permission is required for voice notes", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -284,6 +288,18 @@ fun ChatThreadScreen(
         }
     }
 
+    val visibleDateText by remember(listState, filteredMessages) {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItem = layoutInfo.visibleItemsInfo.firstOrNull { it.key is String && (it.key as String).isNotEmpty() }
+            if (visibleItem != null) {
+                val key = visibleItem.key as? String
+                val msg = filteredMessages.firstOrNull { it.messageId == key }
+                msg?.timestamp?.let { com.example.ui.util.TimeFormatter.formatDateHeader(it) }
+            } else null
+        }
+    }
+
     var lastMessageCount by remember { mutableStateOf(0) }
     var lastMessageId by remember { mutableStateOf<String?>(null) }
 
@@ -352,182 +368,346 @@ fun ChatThreadScreen(
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                TopAppBar(
-                    title = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { showContactDetailsSheet = true }
-                                .padding(vertical = 4.dp, horizontal = 2.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(avatarColor),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = AvatarUtil.getInitials(contactDisplayName),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
+                if (isSelectionMode) {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = "${selectedMessageIds.size} selected",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { selectedMessageIds = emptySet() }) {
+                                Icon(Icons.Default.Close, contentDescription = "Exit Selection Mode")
+                            }
+                        },
+                        actions = {
+                            // Select All / Deselect All
+                            val allSelected = filteredMessages.isNotEmpty() && filteredMessages.all { it.messageId in selectedMessageIds }
+                            IconButton(onClick = {
+                                selectedMessageIds = if (allSelected) {
+                                    emptySet()
+                                } else {
+                                    filteredMessages.map { it.messageId }.toSet()
+                                }
+                            }) {
+                                Icon(
+                                    imageVector = if (allSelected) Icons.Default.Deselect else Icons.Default.SelectAll,
+                                    contentDescription = if (allSelected) "Deselect All" else "Select All"
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(10.dp))
+                            // Details (if single message selected)
+                            if (selectedMessageIds.size == 1) {
+                                val singleMsgId = selectedMessageIds.first()
+                                val singleMsg = filteredMessages.firstOrNull { it.messageId == singleMsgId }
+                                if (singleMsg != null) {
+                                    IconButton(onClick = {
+                                        showMessageInfoDialog = singleMsg
+                                    }) {
+                                        Icon(Icons.Default.Info, contentDescription = "Message Details")
+                                    }
+                                }
+                            }
 
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = contactDisplayName,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
+                            // Copy Selected Messages
+                            IconButton(onClick = {
+                                val selectedMsgs = filteredMessages.filter { it.messageId in selectedMessageIds }
+                                    .sortedBy { it.timestamp }
+                                val combinedText = selectedMsgs.joinToString(separator = "\n\n") { it.content }
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Copied Messages", combinedText))
+                                Toast.makeText(context, "${selectedMsgs.size} message(s) copied", Toast.LENGTH_SHORT).show()
+                                selectedMessageIds = emptySet()
+                            }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy Selected")
+                            }
+
+                            // Share Selected Messages
+                            IconButton(onClick = {
+                                val selectedMsgs = filteredMessages.filter { it.messageId in selectedMessageIds }
+                                    .sortedBy { it.timestamp }
+                                val combinedText = selectedMsgs.joinToString(separator = "\n\n") { it.content }
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, combinedText)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Share Messages via"))
+                                selectedMessageIds = emptySet()
+                            }) {
+                                Icon(Icons.Default.Share, contentDescription = "Share Selected")
+                            }
+
+                            // Delete Selected Messages
+                            IconButton(onClick = {
+                                showDeleteConfirmationDialog = true
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete Selected",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    )
+                } else {
+                    val phone = conversation?.phoneNumber
+                    val name = conversation?.contactName
+                    val contactType: PhoneNumberUtil.ContactType = remember(phone, name) {
+                        PhoneNumberUtil.getContactType(phone, name)
+                    }
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        TopAppBar(
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { showContactDetailsSheet = true }
+                                        .padding(vertical = 4.dp, horizontal = 2.dp)
+                                ) {
+                                    ContactAvatar(
+                                        photoUri = viewModel.getContactPhotoUri(),
+                                        name = contactDisplayName,
+                                        phoneNumber = conversation?.phoneNumber ?: "",
+                                        size = 40.dp
                                     )
-                                    if (conversation?.isPinned == true) {
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector = Icons.Default.PushPin,
-                                            contentDescription = "Pinned",
-                                            modifier = Modifier.size(14.dp),
-                                            tint = MaterialTheme.colorScheme.primary
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
+                                    Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = contactDisplayName,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            if (conversation?.isPinned == true) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Icon(
+                                                    imageVector = Icons.Default.PushPin,
+                                                    contentDescription = "Pinned",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                            if (isMuted) {
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Icon(
+                                                    imageVector = Icons.Default.NotificationsOff,
+                                                    contentDescription = "Muted",
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        val subtitleText = when (contactType) {
+                                            PhoneNumberUtil.ContactType.SERVICE_MESSAGE -> "Automated Service • Verified SMS"
+                                            PhoneNumberUtil.ContactType.UNKNOWN_NUMBER -> conversation?.phoneNumber ?: "Unknown"
+                                            PhoneNumberUtil.ContactType.SAVED_CONTACT -> conversation?.phoneNumber ?: ""
+                                        }
+                                        Text(
+                                            text = subtitleText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
-                                Text(
-                                    text = conversation?.phoneNumber ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        // In-Thread Deep Search Action
-                        IconButton(onClick = { viewModel.toggleSearch() }) {
-                            Icon(
-                                imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = if (isSearchActive) "Close Search" else "Search Messages in Thread"
-                            )
-                        }
-
-                        // Quick Call Action
-                        val phone = conversation?.phoneNumber
-                        if (!phone.isNullOrBlank()) {
-                            IconButton(onClick = {
-                                try {
-                                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                    context.startActivity(dialIntent)
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "Could not open dialer", Toast.LENGTH_SHORT).show()
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = onNavigateBack) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                                 }
-                            }) {
-                                Icon(Icons.Default.Call, contentDescription = "Call Contact")
-                            }
-                        }
-
-                        // Options Menu
-                        IconButton(onClick = { showTopMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Options")
-                        }
-
-                        DropdownMenu(
-                            expanded = showTopMenu,
-                            onDismissRequest = { showTopMenu = false }
-                        ) {
-                            // Call Contact
-                            DropdownMenuItem(
-                                text = { Text("Call Contact") },
-                                onClick = {
-                                    showTopMenu = false
-                                    if (!phone.isNullOrBlank()) {
+                            },
+                            actions = {
+                                // 1. Quick Call Action (hidden for automated service senders)
+                                if (!phone.isNullOrBlank() && contactType != PhoneNumberUtil.ContactType.SERVICE_MESSAGE) {
+                                    IconButton(onClick = {
                                         try {
                                             val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
                                             context.startActivity(dialIntent)
                                         } catch (_: Exception) {
                                             Toast.makeText(context, "Could not open dialer", Toast.LENGTH_SHORT).show()
                                         }
+                                    }) {
+                                        Icon(Icons.Default.Call, contentDescription = "Call Contact")
                                     }
-                                },
-                                leadingIcon = { Icon(Icons.Default.Call, contentDescription = null) }
-                            )
+                                }
 
-                            // View Contact Details
-                            DropdownMenuItem(
-                                text = { Text("View Contact Details") },
-                                onClick = {
-                                    showTopMenu = false
-                                    showContactDetailsSheet = true
-                                },
-                                leadingIcon = { Icon(Icons.Default.ContactPage, contentDescription = null) }
-                            )
+                                // 2. In-Thread Deep Search Action
+                                IconButton(onClick = { viewModel.toggleSearch() }) {
+                                    Icon(
+                                        imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
+                                        contentDescription = if (isSearchActive) "Close Search" else "Search Messages in Thread"
+                                    )
+                                }
 
-                            // Save Contact to Phone
-                            DropdownMenuItem(
-                                text = { Text("Save Contact to Phone") },
-                                onClick = {
-                                    showTopMenu = false
-                                    if (!phone.isNullOrBlank()) {
-                                        saveContactToPhone(context, phone, conversation?.contactName)
+                                // 3. Options Menu
+                                IconButton(onClick = { showTopMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                                }
+
+                                DropdownMenu(
+                                    expanded = showTopMenu,
+                                    onDismissRequest = { showTopMenu = false }
+                                ) {
+                                    // Call Contact (only if callable)
+                                    if (!phone.isNullOrBlank() && contactType != PhoneNumberUtil.ContactType.SERVICE_MESSAGE) {
+                                        DropdownMenuItem(
+                                            text = { Text("Call Contact") },
+                                            onClick = {
+                                                showTopMenu = false
+                                                try {
+                                                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
+                                                    context.startActivity(dialIntent)
+                                                } catch (_: Exception) {
+                                                    Toast.makeText(context, "Could not open dialer", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            leadingIcon = { Icon(Icons.Default.Call, contentDescription = null) }
+                                        )
                                     }
-                                },
-                                leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) }
-                            )
 
-                            // Choose Chat Wallpaper
-                            DropdownMenuItem(
-                                text = { Text("Chat Wallpaper") },
-                                onClick = {
-                                    showTopMenu = false
-                                    showWallpaperPickerSheet = true
-                                },
-                                leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) }
-                            )
+                                    // Mute / Unmute Notifications
+                                    DropdownMenuItem(
+                                        text = { Text(if (isMuted) "Unmute Notifications" else "Mute Notifications") },
+                                        onClick = {
+                                            showTopMenu = false
+                                            viewModel.toggleMute()
+                                            val msg = if (!isMuted) "Notifications muted for this chat" else "Notifications unmuted"
+                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (isMuted) Icons.Default.Notifications else Icons.Default.NotificationsOff,
+                                                contentDescription = null
+                                            )
+                                        }
+                                    )
 
-                            // Conversation Color
-                            DropdownMenuItem(
-                                text = { Text("Conversation Color") },
-                                onClick = {
-                                    showColorPicker = true
-                                    showTopMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.ColorLens, contentDescription = null) }
-                            )
-
-                            // Pin / Unpin
-                            DropdownMenuItem(
-                                text = { Text(if (conversation?.isPinned == true) "Unpin Conversation" else "Pin to Top") },
-                                onClick = {
-                                    viewModel.togglePin()
-                                    showTopMenu = false
-                                },
-                                leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
-                            )
-
-                            // Block / Unblock Number
-                            DropdownMenuItem(
-                                text = { Text(if (conversation?.isBlocked == true) "Unblock Number" else "Block Number") },
-                                onClick = {
-                                    showTopMenu = false
-                                    if (conversation?.isBlocked == true) {
-                                        viewModel.unblockContact()
-                                    } else {
-                                        viewModel.blockContact()
-                                        onNavigateBack()
+                                    // Dual SIM preference selector
+                                    if (availableSims.size > 1) {
+                                        DropdownMenuItem(
+                                            text = { Text("Select SIM for Chat") },
+                                            onClick = {
+                                                showTopMenu = false
+                                                showSimPickerDialog = true
+                                            },
+                                            leadingIcon = { Icon(Icons.Default.SimCard, contentDescription = null) }
+                                        )
                                     }
-                                },
-                                leadingIcon = { Icon(Icons.Default.Block, contentDescription = null) }
-                            )
+
+                                    // View Contact Details
+                                    DropdownMenuItem(
+                                        text = { Text("View Contact Details") },
+                                        onClick = {
+                                            showTopMenu = false
+                                            showContactDetailsSheet = true
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.ContactPage, contentDescription = null) }
+                                    )
+
+                                    // Save Contact to Phone
+                                    if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank()) {
+                                        DropdownMenuItem(
+                                            text = { Text("Save Contact to Phone") },
+                                            onClick = {
+                                                showTopMenu = false
+                                                saveContactToPhone(context, phone, conversation?.contactName)
+                                            },
+                                            leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) }
+                                        )
+                                    }
+
+                                    // Choose Chat Wallpaper
+                                    DropdownMenuItem(
+                                        text = { Text("Chat Wallpaper") },
+                                        onClick = {
+                                            showTopMenu = false
+                                            showWallpaperPickerSheet = true
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) }
+                                    )
+
+                                    // Conversation Color
+                                    DropdownMenuItem(
+                                        text = { Text("Conversation Color") },
+                                        onClick = {
+                                            showColorPicker = true
+                                            showTopMenu = false
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.ColorLens, contentDescription = null) }
+                                    )
+
+                                    // Pin / Unpin
+                                    DropdownMenuItem(
+                                        text = { Text(if (conversation?.isPinned == true) "Unpin Conversation" else "Pin to Top") },
+                                        onClick = {
+                                            viewModel.togglePin()
+                                            showTopMenu = false
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                                    )
+
+                                    // Block / Unblock Number
+                                    DropdownMenuItem(
+                                        text = { Text(if (conversation?.isBlocked == true) "Unblock Number" else "Block Number") },
+                                        onClick = {
+                                            showTopMenu = false
+                                            if (conversation?.isBlocked == true) {
+                                                viewModel.unblockContact()
+                                            } else {
+                                                viewModel.blockContact()
+                                                onNavigateBack()
+                                            }
+                                        },
+                                        leadingIcon = { Icon(Icons.Default.Block, contentDescription = null) }
+                                    )
+                                }
+                            }
+                        )
+
+                        // 4. Unknown Number Banner
+                        if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.PersonOutline,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Unsaved number",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    androidx.compose.material3.TextButton(
+                                        onClick = { saveContactToPhone(context, phone, null) },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("Add to Contacts", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                                    }
+                                }
+                            }
                         }
                     }
-                )
+                }
             },
             bottomBar = {
                 Column(
@@ -622,7 +802,7 @@ fun ChatThreadScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                                 modifier = Modifier
-                                    .clickable { viewModel.cycleNextSim() }
+                                    .clickable { showSimPickerDialog = true }
                                     .padding(vertical = 2.dp)
                             ) {
                                 Row(
@@ -637,7 +817,7 @@ fun ChatThreadScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "${currentSim?.displayName ?: "SIM 1"} (Tap to switch)",
+                                        text = "SIM ${selectedSimIndex + 1}: ${currentSim?.displayName ?: "SIM"} (Tap to change)",
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
@@ -656,147 +836,82 @@ fun ChatThreadScreen(
                         }
                     }
 
-                    // Input composer Row
-                    if (isRecordingVoice) {
-                        Row(
+                    // Input composer Row (Pure SMS)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Surface(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .weight(1f)
+                                .heightIn(min = 44.dp, max = 130.dp)
+                                .wrapContentHeight(),
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         ) {
-                            Surface(
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(26.dp),
-                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 6.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.Bottom
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                IconButton(
+                                    onClick = { showAttachmentSheet = true },
+                                    modifier = Modifier.size(38.dp)
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(12.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.error)
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            text = "Recording: ${String.format("%02d:%02d", recordingDurationSec / 60, recordingDurationSec % 60)}",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
-                                        )
-                                    }
-
-                                    IconButton(onClick = { viewModel.cancelVoiceRecording() }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Cancel Recording",
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Options & Attachments",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = { showQuickResponseSheet = true },
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bolt,
+                                        contentDescription = "Quick Responses",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
 
-                            FloatingActionButton(
-                                onClick = {
-                                    viewModel.stopAndSendVoiceRecording(context)
-                                },
-                                shape = CircleShape,
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .testTag("send_voice_note_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Send Voice Note",
-                                    modifier = Modifier.size(24.dp)
+                                BasicTextField(
+                                    value = inputText,
+                                    onValueChange = { viewModel.updateInputText(it) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 6.dp, vertical = 10.dp)
+                                        .testTag("chat_input_field"),
+                                    maxLines = 5,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 20.sp
+                                    ),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    decorationBox = { innerTextField ->
+                                        if (inputText.isEmpty()) {
+                                            Text(
+                                                text = "Text message (SMS)...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
                                 )
                             }
                         }
-                    } else {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(52.dp),
-                                shape = RoundedCornerShape(26.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(horizontal = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(onClick = { showAttachmentSheet = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = "Options & Attachments",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
 
-                                    IconButton(onClick = { showQuickResponseSheet = true }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Bolt,
-                                            contentDescription = "Quick Responses",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                                    BasicTextField(
-                                        value = inputText,
-                                        onValueChange = { viewModel.updateInputText(it) },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(horizontal = 6.dp)
-                                            .testTag("chat_input_field"),
-                                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        ),
-                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                        decorationBox = { innerTextField ->
-                                            if (inputText.isEmpty()) {
-                                                Text(
-                                                    text = "Text message (SMS)...",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            innerTextField()
-                                        }
-                                    )
-
-                                    IconButton(onClick = { viewModel.updateInputText(inputText + "😊") }) {
-                                        Icon(
-                                            imageVector = Icons.Default.SentimentSatisfiedAlt,
-                                            contentDescription = "Emoji",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            val isTyping = inputText.trim().isNotEmpty()
+                        val isTyping = inputText.trim().isNotEmpty()
+                        Box {
                             FloatingActionButton(
                                 onClick = {
                                     if (isTyping) {
@@ -804,26 +919,42 @@ fun ChatThreadScreen(
                                             viewModel.initiateSendMessage(context)
                                         }
                                     } else {
-                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                                            viewModel.startVoiceRecording(context)
-                                        } else {
-                                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                        }
+                                        Toast.makeText(context, "Type a message to send SMS", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 shape = CircleShape,
-                                containerColor = MaterialTheme.colorScheme.primary,
+                                containerColor = if (isTyping) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(44.dp)
                                     .testTag("send_sms_button")
                             ) {
                                 Icon(
-                                    imageVector = if (isTyping) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic,
-                                    contentDescription = if (isTyping) "Send SMS" else "Record Voice Note",
-                                    modifier = Modifier.size(24.dp)
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send SMS",
+                                    modifier = Modifier.size(20.dp)
                                 )
+                            }
+
+                            if (isTyping && availableSims.size > 1) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    contentColor = MaterialTheme.colorScheme.onSecondary,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(16.dp)
+                                        .clickable { showSimPickerDialog = true }
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "${selectedSimIndex + 1}",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1003,6 +1134,7 @@ fun ChatThreadScreen(
                         val isFromMe = message.senderPhoneNumber == "ME"
                         val isFirstInGroup = index == 0 || filteredMessages[index - 1].senderPhoneNumber != message.senderPhoneNumber
                         val isLastInGroup = index == filteredMessages.size - 1 || filteredMessages[index + 1].senderPhoneNumber != message.senderPhoneNumber
+                        val isSelected = selectedMessageIds.contains(message.messageId)
 
                         MessageBubble(
                             message = message,
@@ -1015,7 +1147,28 @@ fun ChatThreadScreen(
                             showDeliveryMarks = appSettings.deliveryReportMode in listOf("BOTH", "MARKS_ONLY") || (appSettings.deliveryReportMode == "DEFAULT" && appSettings.deliveryReports),
                             customColorHex = conversation?.customColorHex,
                             highlightQuery = searchQuery,
-                            onLongClick = { selectedMessageForAction = message },
+                            isSelectionMode = isSelectionMode,
+                            isSelected = isSelected,
+                            onClick = {
+                                if (isSelectionMode) {
+                                    selectedMessageIds = if (isSelected) {
+                                        selectedMessageIds - message.messageId
+                                    } else {
+                                        selectedMessageIds + message.messageId
+                                    }
+                                }
+                            },
+                            onLongClick = {
+                                if (!isSelectionMode) {
+                                    selectedMessageIds = setOf(message.messageId)
+                                } else {
+                                    selectedMessageIds = if (isSelected) {
+                                        selectedMessageIds - message.messageId
+                                    } else {
+                                        selectedMessageIds + message.messageId
+                                    }
+                                }
+                            },
                             onRetryClick = {
                                 executeWithSmsPermission {
                                     viewModel.retryMessage(message.messageId)
@@ -1023,6 +1176,102 @@ fun ChatThreadScreen(
                             }
                         )
                     }
+                }
+
+                // Floating Date Indicator on Scroll
+                AnimatedVisibility(
+                    visible = listState.isScrollInProgress && visibleDateText != null,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 10.dp)
+                ) {
+                    visibleDateText?.let { dateText ->
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
+                            tonalElevation = 4.dp,
+                            shadowElevation = 2.dp
+                        ) {
+                            Text(
+                                text = dateText,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Return to Latest (Scroll to bottom) Floating Action Button
+                AnimatedVisibility(
+                    visible = !isAtBottom.value && filteredMessages.isNotEmpty(),
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut(),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 12.dp)
+                ) {
+                    FloatingActionButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(filteredMessages.size - 1)
+                            }
+                        },
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp),
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Scroll to bottom",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Multi-select Delete Confirmation Dialog
+                if (showDeleteConfirmationDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirmationDialog = false },
+                        title = { Text("Delete selected messages?", fontWeight = FontWeight.Bold) },
+                        text = { Text("Are you sure you want to delete ${selectedMessageIds.size} message(s)?") },
+                        confirmButton = {
+                            Button(
+                                onClick = {
+                                    val count = selectedMessageIds.size
+                                    val targets = selectedMessageIds.toList()
+                                    selectedMessageIds = emptySet()
+                                    showDeleteConfirmationDialog = false
+
+                                    viewModel.deleteMessagesWithUndo(targets) { restoreAction ->
+                                        coroutineScope.launch {
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = "$count message(s) deleted",
+                                                actionLabel = "UNDO",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                restoreAction()
+                                            }
+                                        }
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            ) {
+                                Text("Delete", color = MaterialTheme.colorScheme.onError)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirmationDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
                 }
 
                 // Message Action Dialog
@@ -1085,6 +1334,15 @@ fun ChatThreadScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 ActionRowItem(
+                                    icon = Icons.Default.Check,
+                                    label = "Select Message",
+                                    onClick = {
+                                        selectedMessageIds = setOf(msg.messageId)
+                                        selectedMessageForAction = null
+                                    }
+                                )
+
+                                ActionRowItem(
                                     icon = Icons.Default.ContentCopy,
                                     label = "Copy Entire Text",
                                     onClick = {
@@ -1124,8 +1382,20 @@ fun ChatThreadScreen(
                                     label = "Delete Message",
                                     tint = MaterialTheme.colorScheme.error,
                                     onClick = {
-                                        viewModel.deleteMessage(msg.messageId)
+                                        val targetId = msg.messageId
                                         selectedMessageForAction = null
+                                        viewModel.deleteMessagesWithUndo(listOf(targetId)) { restoreAction ->
+                                            coroutineScope.launch {
+                                                val result = snackbarHostState.showSnackbar(
+                                                    message = "Message deleted",
+                                                    actionLabel = "UNDO",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) {
+                                                    restoreAction()
+                                                }
+                                            }
+                                        }
                                     }
                                 )
                             }
@@ -1135,27 +1405,10 @@ fun ChatThreadScreen(
 
                 // Message Details Dialog
                 showMessageInfoDialog?.let { msg ->
-                    val len = msg.content.length
-                    val segments = if (len == 0) 1 else ((len - 1) / 153) + 1
-                    AlertDialog(
-                        onDismissRequest = { showMessageInfoDialog = null },
-                        title = { Text("Message Details", fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Type: ${msg.messageType.name}")
-                                Text("Status: ${msg.status.name}")
-                                Text("Sent Time: ${TimeFormatter.formatFullDateTime(msg.timestamp)}")
-                                Text("Characters: $len")
-                                Text("SMS Segments: $segments")
-                                Text("Sender: ${msg.senderPhoneNumber}")
-                                Text("Recipient: ${msg.recipientPhoneNumber}")
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showMessageInfoDialog = null }) {
-                                Text("Close")
-                            }
-                        }
+                    MessageDetailsDialog(
+                        message = msg,
+                        contactName = conversation?.contactName,
+                        onDismiss = { showMessageInfoDialog = null }
                     )
                 }
 
@@ -1355,7 +1608,7 @@ fun ChatThreadScreen(
                     )
                 }
 
-                // Attachment & Options Bottom Sheet
+                // Actions & Attachments Bottom Sheet (SMS Tools)
                 if (showAttachmentSheet) {
                     ModalBottomSheet(
                         onDismissRequest = { showAttachmentSheet = false },
@@ -1367,7 +1620,7 @@ fun ChatThreadScreen(
                                 .padding(24.dp)
                         ) {
                             Text(
-                                text = "Attach & Schedule",
+                                text = "SMS Tools & Actions",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(bottom = 16.dp)
@@ -1379,30 +1632,6 @@ fun ChatThreadScreen(
                                     .padding(vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceAround
                             ) {
-                                AttachmentGridItem(
-                                    icon = Icons.Default.Image,
-                                    label = "Photo Gallery",
-                                    onClick = {
-                                        showAttachmentSheet = false
-                                        photoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    }
-                                )
-
-                                AttachmentGridItem(
-                                    icon = Icons.Default.Mic,
-                                    label = "Voice Note",
-                                    onClick = {
-                                        showAttachmentSheet = false
-                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                                            viewModel.startVoiceRecording(context)
-                                        } else {
-                                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                        }
-                                    }
-                                )
-
                                 AttachmentGridItem(
                                     icon = Icons.Default.Schedule,
                                     label = "Schedule SMS",
@@ -1420,14 +1649,7 @@ fun ChatThreadScreen(
                                         showQuickResponseSheet = true
                                     }
                                 )
-                            }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceAround
-                            ) {
                                 AttachmentGridItem(
                                     icon = Icons.Default.LocationOn,
                                     label = "Location",
@@ -1450,6 +1672,81 @@ fun ChatThreadScreen(
                     }
                 }
             }
+        }
+
+        // Dual SIM Selection Dialog
+        if (showSimPickerDialog && availableSims.isNotEmpty()) {
+            AlertDialog(
+                onDismissRequest = { showSimPickerDialog = false },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.SimCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Select SIM for this Chat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Choose preferred SIM card for sending text messages in this conversation:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        availableSims.forEachIndexed { index, sim ->
+                            val isSelected = index == selectedSimIndex
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable {
+                                        viewModel.setConversationSim(index)
+                                        showSimPickerDialog = false
+                                        Toast.makeText(context, "Set to SIM ${index + 1} (${sim.displayName})", Toast.LENGTH_SHORT).show()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = {
+                                            viewModel.setConversationSim(index)
+                                            showSimPickerDialog = false
+                                            Toast.makeText(context, "Set to SIM ${index + 1} (${sim.displayName})", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "SIM ${index + 1}: ${sim.displayName}",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                        if (sim.carrierName.isNotBlank() && sim.carrierName != sim.displayName) {
+                                            Text(
+                                                text = sim.carrierName,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { showSimPickerDialog = false }) {
+                        Text("Done")
+                    }
+                }
+            )
         }
     }
 }

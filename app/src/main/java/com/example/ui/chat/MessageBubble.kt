@@ -1,19 +1,10 @@
 package com.example.ui.chat
 
-import android.content.ContentValues
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
-import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
-import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,15 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,47 +32,35 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import coil.ImageLoader
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import coil.request.SuccessResult
+import android.widget.Toast
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
-import com.example.data.local.entity.MessageType
-import com.example.ui.theme.BubbleReceivedDark
-import com.example.ui.theme.BubbleReceivedLight
-import com.example.ui.theme.BubbleSentDark
-import com.example.ui.theme.BubbleSentLight
-import com.example.ui.theme.StatusDeliveredColor
+import com.example.ui.util.PhoneNumberUtil
 import com.example.ui.util.TimeFormatter
-import com.example.ui.util.VoiceNoteHelper
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.OutputStream
 
+/**
+ * Pure SMS Message Bubble strictly adhering to the Human-Coded flat design:
+ * - Sent: Primary blue #1688F5 with crisp white text
+ * - Received: Cards/containers #0B1424 (Dark) / #FFFFFF (Light) with subtle border
+ * - Zero gradients, clear typography, and rich SMS ergonomics (OTP chip, Delivery marks, Reactions).
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
@@ -99,31 +74,25 @@ fun MessageBubble(
     showDeliveryMarks: Boolean = true,
     customColorHex: String? = null,
     highlightQuery: String = "",
+    isSelectionMode: Boolean = false,
+    isSelected: Boolean = false,
+    onClick: () -> Unit = {},
     onLongClick: () -> Unit,
-    onRetryClick: () -> Unit
+    onRetryClick: () -> Unit,
+    onMediaClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    var isAudioPlaying by remember { mutableStateOf(false) }
-    var showFullImageDialog by remember { mutableStateOf(false) }
-
-    DisposableEffect(message.messageId) {
-        onDispose {
-            if (isAudioPlaying) {
-                VoiceNoteHelper.stopPlayback()
-                isAudioPlaying = false
-            }
-        }
-    }
+    val clipboardManager = LocalClipboardManager.current
 
     val outerRadius = when (bubbleShape) {
-        "PILL" -> 22.dp
-        "SQUARE" -> 8.dp
-        else -> 18.dp
+        "PILL" -> 24.dp
+        "SQUARE" -> 16.dp
+        else -> 20.dp
     }
     val innerRadius = when (bubbleShape) {
         "PILL" -> 8.dp
-        "SQUARE" -> 3.dp
-        else -> 4.dp
+        "SQUARE" -> 6.dp
+        else -> 6.dp
     }
 
     val shape = if (isFromMe) {
@@ -148,7 +117,7 @@ fun MessageBubble(
 
     val backgroundColor = when {
         isFromMe -> customColor ?: MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.surface
     }
 
     val contentColor = when {
@@ -163,11 +132,6 @@ fun MessageBubble(
         else -> MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp)
     }
 
-    val isVoiceNote = !message.mediaUrl.isNullOrBlank() &&
-            (message.mediaUrl.endsWith(".m4a") || message.mediaUrl.contains("voice_") || message.mediaUrl.endsWith(".mp3"))
-    val isPhotoMms = !message.mediaUrl.isNullOrBlank() && !isVoiceNote
-    val isMms = message.messageType == MessageType.MMS || !message.mediaUrl.isNullOrBlank()
-
     val senderLabel = if (isFromMe) "You" else "Contact"
     val statusLabel = when (message.status) {
         MessageStatus.DELIVERED -> "Delivered"
@@ -177,419 +141,258 @@ fun MessageBubble(
         MessageStatus.READ -> "Read"
         MessageStatus.CANCELLED -> "Cancelled"
     }
-    val accessibilityDescription = "$senderLabel at ${TimeFormatter.formatMessageTimestamp(message.timestamp)}: ${message.content}. Status: $statusLabel. Double tap and hold for options."
+    val accessibilityDescription = "$senderLabel at ${TimeFormatter.formatMessageTimestamp(message.timestamp)}: ${message.content}. Status: $statusLabel."
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = isSelectionMode) { onClick() }
+            .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent)
             .padding(horizontal = 12.dp, vertical = if (isFirstInGroup) 3.dp else 1.5.dp),
-        horizontalAlignment = if (isFromMe) Alignment.End else Alignment.Start
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
-            shape = shape,
-            color = backgroundColor,
-            contentColor = contentColor,
-            modifier = Modifier
-                .widthIn(max = 310.dp)
-                .semantics { contentDescription = accessibilityDescription }
-                .combinedClickable(
-                    onClick = {},
-                    onLongClick = onLongClick
-                )
-                .testTag("message_bubble_${message.messageId}")
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        // Selection Checkmark indicator on Left
+        if (isSelectionMode) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .then(
+                        if (!isSelected) Modifier.background(
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            CircleShape
+                        ) else Modifier
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                // 1. Voice Note Player Layout
-                if (isVoiceNote && message.mediaUrl != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isFromMe) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
-                            else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clickable {
-                                    if (isAudioPlaying) {
-                                        VoiceNoteHelper.stopPlayback()
-                                        isAudioPlaying = false
-                                    } else {
-                                        VoiceNoteHelper.playAudio(
-                                            filePath = message.mediaUrl,
-                                            onCompletion = { isAudioPlaying = false },
-                                            onError = {
-                                                isAudioPlaying = false
-                                                Toast.makeText(context, "Could not play audio", Toast.LENGTH_SHORT).show()
-                                            }
-                                        )
-                                        isAudioPlaying = true
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+        }
+
+        Column(
+            modifier = Modifier.weight(1f),
+            horizontalAlignment = if (isFromMe) Alignment.End else Alignment.Start
+        ) {
+            Surface(
+                shape = shape,
+                color = backgroundColor,
+                contentColor = contentColor,
+                border = if (!isFromMe) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+                tonalElevation = if (isFromMe) 0.dp else 1.dp,
+                modifier = Modifier
+                    .widthIn(max = 310.dp)
+                    .semantics { contentDescription = accessibilityDescription }
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick
+                    )
+                    .testTag("message_bubble_${message.messageId}")
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    // SMS Text Content with Search Highlighting
+                    if (message.content.isNotBlank()) {
+                        SelectionContainer {
+                            if (highlightQuery.isNotBlank() && message.content.contains(highlightQuery, ignoreCase = true)) {
+                                val annotatedString = buildAnnotatedString {
+                                    val text = message.content
+                                    var startIndex = 0
+                                    while (startIndex < text.length) {
+                                        val matchIndex = text.indexOf(highlightQuery, startIndex, ignoreCase = true)
+                                        if (matchIndex == -1) {
+                                            append(text.substring(startIndex))
+                                            break
+                                        }
+                                        append(text.substring(startIndex, matchIndex))
+                                        withStyle(
+                                            style = SpanStyle(
+                                                background = Color(0xFFFDE047),
+                                                color = Color(0xFF1E293B),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        ) {
+                                            append(text.substring(matchIndex, matchIndex + highlightQuery.length))
+                                        }
+                                        startIndex = matchIndex + highlightQuery.length
                                     }
                                 }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = if (isAudioPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isAudioPlaying) "Pause" else "Play",
-                                    tint = contentColor,
-                                    modifier = Modifier.size(22.dp)
+                                Text(
+                                    text = annotatedString,
+                                    style = textStyle,
+                                    color = contentColor
+                                )
+                            } else {
+                                Text(
+                                    text = message.content,
+                                    style = textStyle,
+                                    color = contentColor
                                 )
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Smart OTP / Verification Code Quick-Copy Chip
+                    val detectedOtp = remember(message.content, isFromMe) {
+                        if (!isFromMe) PhoneNumberUtil.extractOtpCode(message.content) else null
+                    }
+                    if (detectedOtp != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .clickable {
+                                    clipboardManager.setText(AnnotatedString(detectedOtp))
+                                    Toast.makeText(context, "Copied code $detectedOtp to clipboard", Toast.LENGTH_SHORT).show()
+                                }
+                                .testTag("otp_copy_chip")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.Mic,
-                                    contentDescription = null,
-                                    tint = contentColor.copy(alpha = 0.8f),
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy code",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                     modifier = Modifier.size(13.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isAudioPlaying) "Playing voice note..." else "Voice Note",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp,
-                                    color = contentColor
+                                    text = "Copy code: $detectedOtp",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            // Audio Waveform Visualizer
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val barHeights = listOf(6, 12, 18, 10, 16, 22, 14, 8, 20, 12, 8, 14, 10, 6)
-                                barHeights.forEachIndexed { i, h ->
-                                    val active = isAudioPlaying && (i % 2 == 0)
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height((if (active) h + 4 else h).dp)
-                                            .clip(RoundedCornerShape(2.dp))
-                                            .background(contentColor.copy(alpha = if (active) 0.95f else 0.45f))
-                                    )
-                                }
-                            }
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
 
-                // 2. Photo MMS Preview
-                if (isPhotoMms && message.mediaUrl != null) {
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        AsyncImage(
-                            model = message.mediaUrl,
-                            contentDescription = "MMS Photo Attachment",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(180.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { showFullImageDialog = true },
-                            contentScale = ContentScale.Crop
+                    // Timestamp + Status Checkmarks
+                    Row(
+                        modifier = Modifier.align(Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = TimeFormatter.formatMessageTimestamp(message.timestamp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = if (isFromMe) contentColor.copy(alpha = 0.75f) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        // Save to gallery button
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.55f),
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(6.dp)
-                                .size(32.dp)
-                                .clickable {
-                                    saveImageToGallery(context, message.mediaUrl)
-                                }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Download,
-                                    contentDescription = "Save photo to device",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-
-                // 3. Text Content with Search Highlighting
-                if (message.content.isNotBlank() && (!isPhotoMms || message.content != "Photo attachment") && (!isVoiceNote || message.content != "Voice message")) {
-                    SelectionContainer {
-                        if (highlightQuery.isNotBlank() && message.content.contains(highlightQuery, ignoreCase = true)) {
-                            val annotatedString = buildAnnotatedString {
-                                val text = message.content
-                                var startIndex = 0
-                                val queryLower = highlightQuery.lowercase()
-                                val textLower = text.lowercase()
-
-                                while (startIndex < text.length) {
-                                    val index = textLower.indexOf(queryLower, startIndex)
-                                    if (index == -1) {
-                                        append(text.substring(startIndex))
-                                        break
-                                    }
-                                    if (index > startIndex) {
-                                        append(text.substring(startIndex, index))
-                                    }
-                                    val matchEnd = index + highlightQuery.length
-                                    withStyle(
-                                        style = SpanStyle(
-                                            background = Color(0xFFFBBF24),
-                                            color = Color.Black,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    ) {
-                                        append(text.substring(index, matchEnd))
-                                    }
-                                    startIndex = matchEnd
-                                }
-                            }
-                            Text(
-                                text = annotatedString,
-                                style = textStyle,
-                                color = contentColor
-                            )
-                        } else {
-                            Text(
-                                text = message.content,
-                                style = textStyle,
-                                color = contentColor
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(3.dp))
-                }
-
-                // 4. Bottom Row: MMS Badge + Timestamp + Status Checkmarks
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (isMms) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = contentColor.copy(alpha = 0.15f),
-                            modifier = Modifier.padding(end = 6.dp)
-                        ) {
-                            Text(
-                                text = "MMS",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                                color = contentColor,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = TimeFormatter.formatMessageTimestamp(message.timestamp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = contentColor.copy(alpha = 0.7f)
-                    )
-
-                    if (isFromMe) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        when (message.status) {
-                            MessageStatus.SENDING -> {
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Sending",
-                                    modifier = Modifier.size(11.dp),
-                                    tint = contentColor.copy(alpha = 0.6f)
-                                )
-                            }
-                            MessageStatus.SENT -> {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = "Sent",
-                                    modifier = Modifier.size(12.dp),
-                                    tint = contentColor.copy(alpha = 0.85f)
-                                )
-                            }
-                            MessageStatus.DELIVERED, MessageStatus.READ -> {
-                                if (showDeliveryMarks) {
+                        if (isFromMe) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            when (message.status) {
+                                MessageStatus.SENDING -> {
                                     Icon(
-                                        imageVector = Icons.Default.DoneAll,
-                                        contentDescription = "Delivered",
-                                        modifier = Modifier.size(14.dp),
-                                        tint = if (isFromMe) StatusDeliveredColor else contentColor
+                                        imageVector = Icons.Default.Schedule,
+                                        contentDescription = "Sending",
+                                        modifier = Modifier.size(11.dp),
+                                        tint = contentColor.copy(alpha = 0.7f)
                                     )
-                                } else {
+                                }
+                                MessageStatus.SENT -> {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Sent",
                                         modifier = Modifier.size(12.dp),
-                                        tint = contentColor.copy(alpha = 0.85f)
+                                        tint = contentColor.copy(alpha = 0.8f)
+                                    )
+                                }
+                                MessageStatus.DELIVERED -> {
+                                    if (showDeliveryMarks) {
+                                        Icon(
+                                            imageVector = Icons.Default.DoneAll,
+                                            contentDescription = "Delivered",
+                                            modifier = Modifier.size(13.dp),
+                                            tint = contentColor
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Sent",
+                                            modifier = Modifier.size(12.dp),
+                                            tint = contentColor.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                }
+                                MessageStatus.READ -> {
+                                    Icon(
+                                        imageVector = Icons.Default.DoneAll,
+                                        contentDescription = "Read",
+                                        modifier = Modifier.size(13.dp),
+                                        tint = contentColor
+                                    )
+                                }
+                                MessageStatus.FAILED -> {
+                                    Icon(
+                                        imageVector = Icons.Default.Error,
+                                        contentDescription = "Failed",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                MessageStatus.CANCELLED -> {
+                                    Icon(
+                                        imageVector = Icons.Default.Error,
+                                        contentDescription = "Cancelled",
+                                        modifier = Modifier.size(13.dp),
+                                        tint = contentColor.copy(alpha = 0.5f)
                                     )
                                 }
                             }
-                            MessageStatus.FAILED -> {
-                                Icon(
-                                    imageVector = Icons.Default.Error,
-                                    contentDescription = "Failed",
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                            MessageStatus.CANCELLED -> {
-                                Icon(
-                                    imageVector = Icons.Default.Error,
-                                    contentDescription = "Cancelled",
-                                    modifier = Modifier.size(13.dp),
-                                    tint = contentColor.copy(alpha = 0.5f)
-                                )
-                            }
                         }
                     }
                 }
             }
-        }
 
-        // Emoji Reaction pill
-        if (!reactionEmoji.isNullOrBlank()) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .align(if (isFromMe) Alignment.End else Alignment.Start)
-            ) {
-                Text(
-                    text = reactionEmoji,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    fontSize = 13.sp
-                )
-            }
-        }
-
-        // Retry prompt if message failed to send
-        if (isFromMe && message.status == MessageStatus.FAILED) {
-            OutlinedButton(
-                onClick = onRetryClick,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .testTag("retry_message_button"),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Failed to send. Tap to retry", style = MaterialTheme.typography.labelSmall)
-            }
-        }
-    }
-
-    // Full screen image preview dialog
-    if (showFullImageDialog && message.mediaUrl != null) {
-        Dialog(onDismissRequest = { showFullImageDialog = false }) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            // Emoji Reaction pill
+            if (!reactionEmoji.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .align(if (isFromMe) Alignment.End else Alignment.Start)
                 ) {
-                    AsyncImage(
-                        model = message.mediaUrl,
-                        contentDescription = "Full MMS Image",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Fit
+                    Text(
+                        text = reactionEmoji,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        fontSize = 13.sp
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        OutlinedButton(
-                            onClick = { showFullImageDialog = false },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Close")
-                        }
-                        Button(
-                            onClick = {
-                                saveImageToGallery(context, message.mediaUrl)
-                                showFullImageDialog = false
-                            },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save to Gallery")
-                        }
-                    }
                 }
             }
-        }
-    }
-}
 
-private fun saveImageToGallery(context: Context, imageUrl: String) {
-    CoroutineScope(Dispatchers.IO).launch {
-        try {
-            val loader = ImageLoader(context)
-            val request = ImageRequest.Builder(context)
-                .data(imageUrl)
-                .allowHardware(false)
-                .build()
-            val result = (loader.execute(request) as? SuccessResult)?.drawable
-            val bitmap = (result as? BitmapDrawable)?.bitmap
-
-            if (bitmap != null) {
-                val filename = "MMS_${System.currentTimeMillis()}.jpg"
-                var fos: OutputStream? = null
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    val contentValues = ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/PaiChat")
-                    }
-                    val imageUri: Uri? = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                    fos = imageUri?.let { context.contentResolver.openOutputStream(it) }
+            // Retry prompt if message failed to send
+            if (isFromMe && message.status == MessageStatus.FAILED) {
+                OutlinedButton(
+                    onClick = onRetryClick,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .testTag("retry_message_button"),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Failed to send. Tap to retry", style = MaterialTheme.typography.labelSmall)
                 }
-
-                fos?.use {
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it)
-                }
-
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Saved photo to Pictures/PaiChat", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Saved image attachment", Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (_: Exception) {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Saved image attachment", Toast.LENGTH_SHORT).show()
             }
         }
     }

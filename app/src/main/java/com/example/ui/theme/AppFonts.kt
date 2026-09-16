@@ -1,37 +1,74 @@
 package com.example.ui.theme
 
-import android.graphics.Typeface as AndroidTypeface
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
+import com.example.R
 
 object AppFonts {
+    private val fontProvider = GoogleFont.Provider(
+        providerAuthority = "com.google.android.gms.fonts",
+        providerPackage = "com.google.android.gms",
+        certificates = R.array.com_google_android_gms_fonts_certs
+    )
+
+    private val interFont = GoogleFont("Inter")
+    val InterFontFamily = FontFamily(
+        Font(googleFont = interFont, fontProvider = fontProvider, weight = FontWeight.Normal),
+        Font(googleFont = interFont, fontProvider = fontProvider, weight = FontWeight.Medium),
+        Font(googleFont = interFont, fontProvider = fontProvider, weight = FontWeight.SemiBold),
+        Font(googleFont = interFont, fontProvider = fontProvider, weight = FontWeight.Bold)
+    )
+
+    private val robotoFlexFont = GoogleFont("Roboto Flex")
+    val RobotoFlexFontFamily = FontFamily(
+        Font(googleFont = robotoFlexFont, fontProvider = fontProvider, weight = FontWeight.Normal),
+        Font(googleFont = robotoFlexFont, fontProvider = fontProvider, weight = FontWeight.Medium),
+        Font(googleFont = robotoFlexFont, fontProvider = fontProvider, weight = FontWeight.SemiBold),
+        Font(googleFont = robotoFlexFont, fontProvider = fontProvider, weight = FontWeight.Bold)
+    )
+
+    private val manropeFont = GoogleFont("Manrope")
+    val ManropeFontFamily = FontFamily(
+        Font(googleFont = manropeFont, fontProvider = fontProvider, weight = FontWeight.Normal),
+        Font(googleFont = manropeFont, fontProvider = fontProvider, weight = FontWeight.Medium),
+        Font(googleFont = manropeFont, fontProvider = fontProvider, weight = FontWeight.SemiBold),
+        Font(googleFont = manropeFont, fontProvider = fontProvider, weight = FontWeight.Bold)
+    )
+
+    private val plusJakartaFont = GoogleFont("Plus Jakarta Sans")
+    val PlusJakartaFontFamily = FontFamily(
+        Font(googleFont = plusJakartaFont, fontProvider = fontProvider, weight = FontWeight.Normal),
+        Font(googleFont = plusJakartaFont, fontProvider = fontProvider, weight = FontWeight.Medium),
+        Font(googleFont = plusJakartaFont, fontProvider = fontProvider, weight = FontWeight.SemiBold),
+        Font(googleFont = plusJakartaFont, fontProvider = fontProvider, weight = FontWeight.Bold)
+    )
+
+    private val dmSansFont = GoogleFont("DM Sans")
+    val DmSansFontFamily = FontFamily(
+        Font(googleFont = dmSansFont, fontProvider = fontProvider, weight = FontWeight.Normal),
+        Font(googleFont = dmSansFont, fontProvider = fontProvider, weight = FontWeight.Medium),
+        Font(googleFont = dmSansFont, fontProvider = fontProvider, weight = FontWeight.SemiBold),
+        Font(googleFont = dmSansFont, fontProvider = fontProvider, weight = FontWeight.Bold)
+    )
+
     val fontsList = listOf(
-        FontOption("DEFAULT", "System Default"),
-        FontOption("SERIF", "Classic Serif"),
-        FontOption("MONOSPACE", "Modern Monospace"),
-        FontOption("ROUNDED", "Elegant Rounded"),
-        FontOption("CONDENSED", "Condensed Bold"),
-        FontOption("CASUAL", "Casual Type"),
-        FontOption("CURSIVE", "Creative Cursive"),
-        FontOption("THIN", "Minimalist Thin"),
-        FontOption("LIGHT", "Sophisticated Light"),
-        FontOption("MEDIUM", "Bold Medium"),
-        FontOption("BLACK", "Ultra Black")
+        FontOption("INTER", "Inter (Default)"),
+        FontOption("ROBOTO_FLEX", "Roboto Flex"),
+        FontOption("MANROPE", "Manrope"),
+        FontOption("PLUS_JAKARTA", "Plus Jakarta Sans"),
+        FontOption("DM_SANS", "DM Sans")
     )
 
     fun getFontFamily(key: String): FontFamily {
         return when (key.uppercase()) {
-            "SERIF" -> FontFamily.Serif
-            "MONOSPACE" -> FontFamily.Monospace
-            "ROUNDED" -> try { FontFamily(AndroidTypeface.create("sans-serif-rounded", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "CONDENSED" -> try { FontFamily(AndroidTypeface.create("sans-serif-condensed", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "CASUAL" -> try { FontFamily(AndroidTypeface.create("casual", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "CURSIVE" -> try { FontFamily(AndroidTypeface.create("cursive", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "THIN" -> try { FontFamily(AndroidTypeface.create("sans-serif-thin", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "LIGHT" -> try { FontFamily(AndroidTypeface.create("sans-serif-light", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "MEDIUM" -> try { FontFamily(AndroidTypeface.create("sans-serif-medium", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            "BLACK" -> try { FontFamily(AndroidTypeface.create("sans-serif-black", AndroidTypeface.NORMAL)) } catch (_: Exception) { FontFamily.Default }
-            else -> FontFamily.Default
+            "ROBOTO_FLEX" -> RobotoFlexFontFamily
+            "MANROPE" -> ManropeFontFamily
+            "PLUS_JAKARTA" -> PlusJakartaFontFamily
+            "DM_SANS" -> DmSansFontFamily
+            else -> InterFontFamily
         }
     }
 

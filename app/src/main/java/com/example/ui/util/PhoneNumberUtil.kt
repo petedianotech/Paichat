@@ -44,4 +44,77 @@ object PhoneNumberUtil {
         }
         return false
     }
+
+    /**
+     * Determines whether a sender address is an automated service, short code,
+     * network notification, or bank/carrier alert.
+     */
+    fun isServiceMessage(sender: String?): Boolean {
+        if (sender.isNullOrBlank()) return false
+        val clean = sender.trim()
+
+        // Carrier USSD / short codes (*100#, #123#, etc.)
+        if (clean.startsWith("*") || clean.startsWith("#") || clean.endsWith("#")) {
+            return true
+        }
+
+        // Alphanumeric sender ID (contains letters and no +, e.g., "GOOGLE", "VERIZON", "CHASE")
+        val lettersOnly = clean.filter { it.isLetter() }
+        val digitsOnly = clean.filter { it.isDigit() }
+        if (lettersOnly.isNotEmpty() && !clean.startsWith("+") && !clean.contains("@")) {
+            return true
+        }
+
+        // Standard telephony short codes (3 to 6 digits, without country code prefix)
+        if (digitsOnly.length in 3..6 && !clean.startsWith("+")) {
+            return true
+        }
+
+        return false
+    }
+
+    enum class ContactType {
+        SAVED_CONTACT,
+        UNKNOWN_NUMBER,
+        SERVICE_MESSAGE
+    }
+
+    /**
+     * Classifies a conversation into a Saved Contact, Unknown Number, or Service Message.
+     */
+    fun getContactType(phoneNumber: String?, contactName: String?): ContactType {
+        if (isServiceMessage(phoneNumber)) {
+            return ContactType.SERVICE_MESSAGE
+        }
+        val cleanName = contactName?.trim()
+        val cleanPhone = phoneNumber?.trim()
+        if (!cleanName.isNullOrBlank() && cleanName != cleanPhone && !isServiceMessage(cleanName)) {
+            return ContactType.SAVED_CONTACT
+        }
+        return ContactType.UNKNOWN_NUMBER
+    }
+
+    /**
+     * Helper to detect one-time verification codes or passwords (OTP) in service messages.
+     * Extracts 4-8 digit codes typically accompanying keywords like 'code', 'OTP', 'verification'.
+     */
+    fun extractOtpCode(messageText: String): String? {
+        if (messageText.isBlank()) return null
+        val lower = messageText.lowercase()
+        val hasOtpKeyword = lower.contains("code") ||
+                lower.contains("otp") ||
+                lower.contains("verify") ||
+                lower.contains("verification") ||
+                lower.contains("password") ||
+                lower.contains("pin") ||
+                lower.contains("secret") ||
+                lower.contains("passcode")
+
+        if (!hasOtpKeyword) return null
+
+        // Match 4 to 8 consecutive digits
+        val regex = Regex("""\b\d{4,8}\b""")
+        val match = regex.find(messageText)
+        return match?.value
+    }
 }

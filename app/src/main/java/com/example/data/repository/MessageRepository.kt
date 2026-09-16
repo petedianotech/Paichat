@@ -522,6 +522,34 @@ class MessageRepository(
         }
     }
 
+    fun searchMessages(query: String): Flow<List<MessageEntity>> {
+        return messageDao.searchMessages(query)
+    }
+
+    suspend fun getConversationDirect(conversationId: String): ConversationEntity? {
+        return conversationDao.getConversationByIdDirect(conversationId)
+    }
+
+    suspend fun getMessagesDirect(conversationId: String): List<MessageEntity> {
+        return messageDao.getMessagesForConversationFlexibleDirect(
+            conversationId = conversationId,
+            normalizedId = PhoneNumberUtil.normalize(conversationId)
+        )
+    }
+
+    suspend fun restoreConversationAndMessages(conversation: ConversationEntity, messages: List<MessageEntity>) {
+        conversationDao.insertConversation(conversation)
+        if (messages.isNotEmpty()) {
+            messageDao.insertMessages(messages)
+        }
+    }
+
+    suspend fun restoreMessages(messages: List<MessageEntity>) {
+        if (messages.isNotEmpty()) {
+            messageDao.insertMessages(messages)
+        }
+    }
+
     suspend fun deleteConversation(conversationId: String) {
         messageDao.deleteMessagesForConversation(conversationId)
         conversationDao.deleteConversationById(conversationId)
@@ -529,5 +557,9 @@ class MessageRepository(
 
     suspend fun deleteMessage(messageId: String) {
         messageDao.deleteMessageById(messageId)
+    }
+
+    suspend fun deleteMessages(messageIds: Set<String>) {
+        messageIds.forEach { messageDao.deleteMessageById(it) }
     }
 }

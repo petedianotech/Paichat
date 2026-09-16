@@ -126,22 +126,6 @@ class ProfileViewModel(
         userPreferences.setShowCharacterCounter(enabled)
     }
 
-    fun setMmsSizeLimit(limit: String) {
-        userPreferences.setMmsSizeLimit(limit)
-    }
-
-    fun setMmsImageCompressionQuality(quality: String) {
-        userPreferences.setMmsImageCompressionQuality(quality)
-    }
-
-    fun setAutoDownloadMms(mode: String) {
-        userPreferences.setAutoDownloadMms(mode)
-    }
-
-    fun setAutoSavePhotos(enabled: Boolean) {
-        userPreferences.setAutoSavePhotos(enabled)
-    }
-
     fun setNotificationSound(enabled: Boolean) {
         userPreferences.setNotificationSound(enabled)
     }
