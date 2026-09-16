@@ -9,8 +9,27 @@ object PhoneNumberUtil {
     fun normalize(phone: String?): String {
         if (phone.isNullOrBlank()) return ""
         val trimmed = phone.trim()
-        val hasPlus = trimmed.startsWith("+")
-        val digitsAndLetters = trimmed.filter { it.isLetterOrDigit() }
+        
+        // Remove spaces, dashes, parentheses, keeping digits and +
+        val clean = trimmed.filter { it.isDigit() || it == '+' }
+        
+        // Extract only digits to check Malawi national number formats
+        val digits = clean.filter { it.isDigit() }
+        
+        if (digits.length == 9) {
+            // E.g., "999123456" -> "+265999123456"
+            return "+265$digits"
+        } else if (digits.length == 10 && digits.startsWith("0")) {
+            // E.g., "0999123456" -> "+265999123456" (strip leading 0)
+            return "+265${digits.substring(1)}"
+        } else if (digits.length == 12 && digits.startsWith("265")) {
+            // E.g., "265999123456" or "+265999123456" -> "+265999123456"
+            return "+265${digits.substring(3)}"
+        }
+        
+        // Fallback for short codes, services or non-Malawi numbers
+        val hasPlus = clean.startsWith("+")
+        val digitsAndLetters = clean.filter { it.isLetterOrDigit() }
         return if (hasPlus) "+$digitsAndLetters" else digitsAndLetters
     }
 

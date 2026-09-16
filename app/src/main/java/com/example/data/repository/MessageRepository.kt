@@ -446,16 +446,18 @@ class MessageRepository(
         messageType: MessageType = MessageType.SMS,
         mediaUrl: String? = null
     ) {
+        val normalizedPhone = PhoneNumberUtil.normalize(senderPhone)
         // Drop message if blocked
-        if (blockedContactDao.isBlocked(senderPhone)) {
+        if (blockedContactDao.isBlocked(normalizedPhone) || blockedContactDao.isBlocked(senderPhone)) {
             return
         }
 
-        val conversationId = senderPhone
+        val conversationId = normalizedPhone
         val timestamp = System.currentTimeMillis()
 
         // 1. Database-level deduplication check
-        val recentDuplicate = messageDao.findRecentIncomingMessage(senderPhone, content, timestamp - 10_000L)
+        val recentDuplicate = messageDao.findRecentIncomingMessage(normalizedPhone, content, timestamp - 10_000L)
+            ?: messageDao.findRecentIncomingMessage(senderPhone, content, timestamp - 10_000L)
         if (recentDuplicate != null) {
             android.util.Log.d("MessageRepository", "Duplicate message from $senderPhone already stored in DB - ignoring")
             return
@@ -463,7 +465,7 @@ class MessageRepository(
 
         val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
         val unread = (existingConversation?.unreadCount ?: 0) + 1
-        val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
+        val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(normalizedPhone)?.name ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
 
         val messageSummary = when {
             mediaUrl != null && (mediaUrl.endsWith(".m4a") || mediaUrl.contains("voice_")) -> "🎵 Voice message"
@@ -474,7 +476,7 @@ class MessageRepository(
 
         val conversation = ConversationEntity(
             conversationId = conversationId,
-            phoneNumber = senderPhone,
+            phoneNumber = normalizedPhone,
             contactName = resolvedName,
             lastMessage = messageSummary,
             lastMessageTimestamp = timestamp,
@@ -490,7 +492,7 @@ class MessageRepository(
         val message = MessageEntity(
             messageId = UUID.randomUUID().toString(),
             conversationId = conversationId,
-            senderPhoneNumber = senderPhone,
+            senderPhoneNumber = normalizedPhone,
             recipientPhoneNumber = "ME",
             content = content,
             timestamp = timestamp,
@@ -505,17 +507,17 @@ class MessageRepository(
         // 2. Trigger standard Android notification (always reliable in notification shade)
         NotificationHelper.showIncomingMessageNotification(
             context = context,
-            senderPhone = senderPhone,
+            senderPhone = normalizedPhone,
             senderName = resolvedName,
             messageText = content,
             vibratePattern = appSettings.notificationVibratePattern
         )
 
         // 3. Trigger custom preview popup if enabled in settings and user is not already active in this chat
-        if (appSettings.quickReplyPopup && com.example.ui.util.ActiveConversationTracker.activeConversationId != senderPhone) {
+        if (appSettings.quickReplyPopup && com.example.ui.util.ActiveConversationTracker.activeConversationId != normalizedPhone) {
             NotificationHelper.launchQuickReplyPopup(
                 context = context,
-                senderPhone = senderPhone,
+                senderPhone = normalizedPhone,
                 senderName = resolvedName,
                 messageText = content
             )

@@ -428,6 +428,17 @@ class ChatViewModel(
         return contactRepository.getPhotoUriForPhoneNumber(conv.phoneNumber)
     }
 
+    fun getResolvedName(phone: String?): String? {
+        if (phone.isNullOrBlank()) return null
+        return contactRepository.getContactByPhoneNumber(phone)?.name
+    }
+
+    fun isContactSaved(phone: String?): Boolean {
+        if (phone.isNullOrBlank()) return false
+        val contact = contactRepository.getContactByPhoneNumber(phone)
+        return contact != null && contact.name.isNotBlank() && contact.name != contact.phoneNumber
+    }
+
     fun startVoiceRecording(context: Context) {
         val file = VoiceNoteHelper.startRecording(context)
         if (file != null) {

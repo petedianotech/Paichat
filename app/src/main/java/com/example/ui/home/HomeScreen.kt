@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -132,6 +133,7 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .background(MaterialTheme.colorScheme.background)
                     .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
             ) {
@@ -389,7 +391,13 @@ fun HomeScreen(
                 }
             )
 
-            if (conversations.isEmpty()) {
+            val showEmptyState = if (searchQuery.isNotBlank()) {
+                conversations.isEmpty() && matchedMessages.isEmpty()
+            } else {
+                conversations.isEmpty()
+            }
+
+            if (showEmptyState) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

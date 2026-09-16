@@ -75,7 +75,7 @@ class HomeViewModel(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val matchedMessages: StateFlow<List<MessageEntity>> = _searchQuery.flatMapLatest { query ->
-        if (query.trim().length >= 2) {
+        if (query.trim().isNotEmpty()) {
             messageRepository.searchMessages(query.trim())
         } else {
             flowOf(emptyList())

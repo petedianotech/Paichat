@@ -32,6 +32,12 @@ class SmsReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         Log.d(TAG, "onReceive action: $action")
 
+        val isDefault = Telephony.Sms.getDefaultSmsPackage(context) == context.packageName
+        if (action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION && isDefault) {
+            Log.d(TAG, "Ignoring SMS_RECEIVED_ACTION because we are default SMS app and handle SMS_DELIVER_ACTION")
+            return
+        }
+
         if (action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION ||
             action == Telephony.Sms.Intents.SMS_DELIVER_ACTION ||
             action == "android.provider.Telephony.SMS_DELIVERED"

@@ -19,7 +19,7 @@ object MessageDeduplicator {
         val now = System.currentTimeMillis()
         cleanOldEntries(now)
 
-        val normalizedSender = sender.trim().replace(" ", "").replace("-", "")
+        val normalizedSender = PhoneNumberUtil.normalize(sender)
         val normalizedContent = content.trim()
         val key = "$normalizedSender|$normalizedContent"
 

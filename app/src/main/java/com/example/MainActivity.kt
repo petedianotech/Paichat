@@ -6,14 +6,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
 import com.example.data.preference.UserPreferences
 import com.example.ui.navigation.PulseChatNavHost
 import com.example.ui.theme.PaiChatTheme
@@ -41,6 +45,17 @@ class MainActivity : ComponentActivity() {
                     PulseChatNavHost(
                         initialConversationId = targetConversationId
                     )
+
+                    if (!appSettings.isTermsAccepted) {
+                        TermsAgreementDialog(
+                            onAccept = {
+                                userPreferences.setTermsAccepted(true)
+                            },
+                            onDecline = {
+                                finish()
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -72,5 +87,114 @@ class MainActivity : ComponentActivity() {
         }
         return null
     }
+}
+
+@Composable
+fun TermsAgreementDialog(
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+
+    AlertDialog(
+        onDismissRequest = {}, // Force explicit action
+        title = {
+            Text(
+                text = "Welcome to PaiChat",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Developer Credit:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Developed by ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Peter Damiano",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline,
+                        modifier = Modifier.clickable {
+                            try {
+                                uriHandler.openUri("https://peterdamiano.vercel.app")
+                            } catch (_: Exception) {}
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Terms & Privacy Policy:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = "1. Local Storage:\nAll message databases and system configurations are processed and stored locally on your device safely.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "2. Complete Privacy:\nPaiChat does NOT collect, upload, or share your messages, phone numbers, contact records, or any personal transcripts with external servers or third-parties.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Text(
+                    text = "3. Requested Permissions:\nThe app requests SMS, MMS, and Contacts permissions solely to send/receive texts and show your friends' names correctly.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "By clicking Agree, you accept these terms and agree to use the application in compliance with local regulations.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onAccept
+            ) {
+                Text("Agree & Accept")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDecline
+            ) {
+                Text("Decline & Exit")
+            }
+        }
+    )
 }
 

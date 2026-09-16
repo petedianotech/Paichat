@@ -333,7 +333,13 @@ fun ChatThreadScreen(
     val activeWallpaperId = conversation?.customWallpaper ?: appSettings.defaultChatWallpaper
     val activeWallpaper = ChatWallpapers.getWallpaperById(activeWallpaperId)
 
-    val contactDisplayName = conversation?.contactName ?: conversation?.phoneNumber ?: "Chat"
+    val contactDisplayName = remember(conversation, conversation?.contactName, conversation?.phoneNumber) {
+        val phone = conversation?.phoneNumber
+        val deviceName = viewModel.getResolvedName(phone)
+        deviceName ?: conversation?.contactName ?: phone ?: "Chat"
+    }
+    val phone = conversation?.phoneNumber
+    val isSavedOnDevice = remember(phone) { viewModel.isContactSaved(phone) }
     val avatarColor = AvatarUtil.getAvatarColor(conversation?.phoneNumber ?: "")
 
     // SMS Segment Calculator
@@ -554,22 +560,7 @@ fun ChatThreadScreen(
                                     expanded = showTopMenu,
                                     onDismissRequest = { showTopMenu = false }
                                 ) {
-                                    // Call Contact (only if callable)
-                                    if (!phone.isNullOrBlank() && contactType != PhoneNumberUtil.ContactType.SERVICE_MESSAGE) {
-                                        DropdownMenuItem(
-                                            text = { Text("Call Contact") },
-                                            onClick = {
-                                                showTopMenu = false
-                                                try {
-                                                    val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                                    context.startActivity(dialIntent)
-                                                } catch (_: Exception) {
-                                                    Toast.makeText(context, "Could not open dialer", Toast.LENGTH_SHORT).show()
-                                                }
-                                            },
-                                            leadingIcon = { Icon(Icons.Default.Call, contentDescription = null) }
-                                        )
-                                    }
+
 
                                     // Mute / Unmute Notifications
                                     DropdownMenuItem(
@@ -611,7 +602,7 @@ fun ChatThreadScreen(
                                     )
 
                                     // Save Contact to Phone
-                                    if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank()) {
+                                    if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank() && !isSavedOnDevice) {
                                         DropdownMenuItem(
                                             text = { Text("Save Contact to Phone") },
                                             onClick = {
@@ -671,7 +662,7 @@ fun ChatThreadScreen(
                         )
 
                         // 4. Unknown Number Banner
-                        if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank()) {
+                        if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank() && !isSavedOnDevice) {
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier.fillMaxWidth()

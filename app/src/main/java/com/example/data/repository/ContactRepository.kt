@@ -171,6 +171,6 @@ class ContactRepository {
     }
 
     private fun normalizePhoneNumber(phone: String): String {
-        return phone.replace(Regex("[^0-9+]"), "")
+        return com.example.ui.util.PhoneNumberUtil.normalize(phone)
     }
 }

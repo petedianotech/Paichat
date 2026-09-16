@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 data class AppSettings(
     val isOnboarded: Boolean = false,
+    val isTermsAccepted: Boolean = false,
     val themeMode: String = "SYSTEM", // SYSTEM, LIGHT, DARK, AMOLED
     val colorTheme: String = "BLUE", // BLUE, INDIGO, PURPLE, ROSE, TEAL, AMBER
     val sendDelaySeconds: Int = 3, // 0 (off), 1, 2, 3, 5, 10
@@ -64,6 +65,7 @@ class UserPreferences(context: Context) {
 
         private fun loadSettings(prefs: SharedPreferences): AppSettings {
             val onboarded = prefs.getBoolean("is_onboarded", false)
+            val acceptedTerms = prefs.getBoolean("has_accepted_terms", false)
             val theme = prefs.getString("theme_mode", "SYSTEM") ?: "SYSTEM"
             val color = prefs.getString("color_theme", "BLUE") ?: "BLUE"
             val delay = prefs.getInt("send_delay_seconds", 3)
@@ -92,6 +94,7 @@ class UserPreferences(context: Context) {
 
             return AppSettings(
                 isOnboarded = onboarded,
+                isTermsAccepted = acceptedTerms,
                 themeMode = theme,
                 colorTheme = color,
                 sendDelaySeconds = delay,
@@ -131,6 +134,11 @@ class UserPreferences(context: Context) {
     fun setOnboarded(onboarded: Boolean = true) {
         prefs.edit().putBoolean("is_onboarded", onboarded).apply()
         _appSettings.value = _appSettings.value.copy(isOnboarded = onboarded)
+    }
+
+    fun setTermsAccepted(accepted: Boolean = true) {
+        prefs.edit().putBoolean("has_accepted_terms", accepted).apply()
+        _appSettings.value = _appSettings.value.copy(isTermsAccepted = accepted)
     }
 
     fun setThemeMode(mode: String) {
