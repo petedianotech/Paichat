@@ -14,6 +14,7 @@ import com.example.data.local.entity.MessageType
 import com.example.data.model.SyncProgress
 import com.example.data.preference.UserPreferences
 import com.example.data.repository.ContactRepository
+import com.example.ui.util.PhoneNumberUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -127,32 +128,43 @@ class SmsSyncHelper(
                 val read = if (readIdx >= 0) c.getInt(readIdx) else 1
 
                 if (!address.isNullOrBlank()) {
+                    val normalizedAddr = PhoneNumberUtil.normalize(address)
                     val isFromMe = type == Telephony.Sms.MESSAGE_TYPE_SENT || type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
-                    val sender = if (isFromMe) "ME" else address
-                    val recipient = if (isFromMe) address else "ME"
+                    val sender = if (isFromMe) "ME" else normalizedAddr
+                    val recipient = if (isFromMe) normalizedAddr else "ME"
 
-                    val existingLatest = latestByAddress[address]
-                    if (existingLatest == null || date > existingLatest.second) {
-                        latestByAddress[address] = Pair(body, date)
-                    }
-
-                    if (!isFromMe && read == 0) {
-                        unreadByAddress[address] = (unreadByAddress[address] ?: 0) + 1
-                    }
-
-                    newMessages.add(
-                        MessageEntity(
-                            messageId = "sms_${smsId}",
-                            conversationId = address,
-                            senderPhoneNumber = sender,
-                            recipientPhoneNumber = recipient,
-                            content = body,
-                            timestamp = date,
-                            messageType = MessageType.SMS,
-                            status = if (isFromMe) MessageStatus.SENT else MessageStatus.READ
-                        )
+                    val isSimilar = messageDao.hasSimilarMessage(
+                        conversationId = normalizedAddr,
+                        normalizedId = normalizedAddr,
+                        content = body,
+                        minTimestamp = date - 15000L,
+                        maxTimestamp = date + 15000L
                     )
-                    count++
+
+                    if (!isSimilar) {
+                        val existingLatest = latestByAddress[normalizedAddr]
+                        if (existingLatest == null || date > existingLatest.second) {
+                            latestByAddress[normalizedAddr] = Pair(body, date)
+                        }
+
+                        if (!isFromMe && read == 0) {
+                            unreadByAddress[normalizedAddr] = (unreadByAddress[normalizedAddr] ?: 0) + 1
+                        }
+
+                        newMessages.add(
+                            MessageEntity(
+                                messageId = "sms_${smsId}",
+                                conversationId = normalizedAddr,
+                                senderPhoneNumber = sender,
+                                recipientPhoneNumber = recipient,
+                                content = body,
+                                timestamp = date,
+                                messageType = MessageType.SMS,
+                                status = if (isFromMe) MessageStatus.SENT else MessageStatus.READ
+                            )
+                        )
+                        count++
+                    }
                 }
             }
         }
@@ -230,6 +242,8 @@ class SmsSyncHelper(
         val conversationLatestMap = HashMap<String, Pair<String, Long>>()
         val conversationUnreadMap = HashMap<String, Int>()
 
+        val dbIsEmpty = messageDao.getMessageCount() == 0
+
         var processed = 0
         var phase1Completed = false
 
@@ -243,31 +257,46 @@ class SmsSyncHelper(
                 val read = if (readIdx >= 0) c.getInt(readIdx) else 1
 
                 if (!address.isNullOrBlank()) {
+                    val normalizedAddr = PhoneNumberUtil.normalize(address)
                     val isFromMe = type == Telephony.Sms.MESSAGE_TYPE_SENT || type == Telephony.Sms.MESSAGE_TYPE_OUTBOX
-                    val sender = if (isFromMe) "ME" else address
-                    val recipient = if (isFromMe) address else "ME"
+                    val sender = if (isFromMe) "ME" else normalizedAddr
+                    val recipient = if (isFromMe) normalizedAddr else "ME"
 
-                    val currentLatest = conversationLatestMap[address]
-                    if (currentLatest == null || date > currentLatest.second) {
-                        conversationLatestMap[address] = Pair(body, date)
-                    }
-
-                    if (!isFromMe && read == 0) {
-                        conversationUnreadMap[address] = (conversationUnreadMap[address] ?: 0) + 1
-                    }
-
-                    allMessages.add(
-                        MessageEntity(
-                            messageId = "sms_${smsId}",
-                            conversationId = address,
-                            senderPhoneNumber = sender,
-                            recipientPhoneNumber = recipient,
+                    val isSimilar = if (!dbIsEmpty) {
+                        messageDao.hasSimilarMessage(
+                            conversationId = normalizedAddr,
+                            normalizedId = normalizedAddr,
                             content = body,
-                            timestamp = date,
-                            messageType = MessageType.SMS,
-                            status = if (isFromMe) MessageStatus.SENT else MessageStatus.READ
+                            minTimestamp = date - 15000L,
+                            maxTimestamp = date + 15000L
                         )
-                    )
+                    } else {
+                        false
+                    }
+
+                    if (!isSimilar) {
+                        val currentLatest = conversationLatestMap[normalizedAddr]
+                        if (currentLatest == null || date > currentLatest.second) {
+                            conversationLatestMap[normalizedAddr] = Pair(body, date)
+                        }
+
+                        if (!isFromMe && read == 0) {
+                            conversationUnreadMap[normalizedAddr] = (conversationUnreadMap[normalizedAddr] ?: 0) + 1
+                        }
+
+                        allMessages.add(
+                            MessageEntity(
+                                messageId = "sms_${smsId}",
+                                conversationId = normalizedAddr,
+                                senderPhoneNumber = sender,
+                                recipientPhoneNumber = recipient,
+                                content = body,
+                                timestamp = date,
+                                messageType = MessageType.SMS,
+                                status = if (isFromMe) MessageStatus.SENT else MessageStatus.READ
+                            )
+                        )
+                    }
                 }
 
                 processed++

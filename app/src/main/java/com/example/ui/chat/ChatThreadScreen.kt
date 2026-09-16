@@ -333,13 +333,14 @@ fun ChatThreadScreen(
     val activeWallpaperId = conversation?.customWallpaper ?: appSettings.defaultChatWallpaper
     val activeWallpaper = ChatWallpapers.getWallpaperById(activeWallpaperId)
 
-    val contactDisplayName = remember(conversation, conversation?.contactName, conversation?.phoneNumber) {
+    val contactsMap by viewModel.contactsMap.collectAsState()
+    val contactDisplayName = remember(conversation, conversation?.contactName, conversation?.phoneNumber, contactsMap) {
         val phone = conversation?.phoneNumber
         val deviceName = viewModel.getResolvedName(phone)
         deviceName ?: conversation?.contactName ?: phone ?: "Chat"
     }
     val phone = conversation?.phoneNumber
-    val isSavedOnDevice = remember(phone) { viewModel.isContactSaved(phone) }
+    val isSavedOnDevice = remember(phone, contactsMap) { viewModel.isContactSaved(phone) }
     val avatarColor = AvatarUtil.getAvatarColor(conversation?.phoneNumber ?: "")
 
     // SMS Segment Calculator

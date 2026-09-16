@@ -676,6 +676,52 @@ private fun MainSettingsIndex(
             )
         }
 
+        // Developer Credits Section
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_developer_credits_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Developer Credits",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "PaiChat is developed and maintained with passion by Peter Damiano.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = {
+                        try {
+                            uriHandler.openUri("https://peterdamiano.vercel.app")
+                        } catch (_: Exception) {}
+                    },
+                    modifier = Modifier.align(Alignment.End),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Visit Portfolio", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
     }
 }

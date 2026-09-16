@@ -47,6 +47,7 @@ class ChatViewModel(
 ) : ViewModel() {
 
     val appSettings: StateFlow<AppSettings> = userPreferences.appSettings
+    val contactsMap = contactRepository.contactsMap
 
     private val _conversation = MutableStateFlow<ConversationEntity?>(null)
     val conversation: StateFlow<ConversationEntity?> = _conversation.asStateFlow()

@@ -61,6 +61,26 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE messageId = :messageId")
     suspend fun getMessageById(messageId: String): MessageEntity?
 
+    @Query("SELECT COUNT(*) FROM messages")
+    suspend fun getMessageCount(): Int
+
+    @Query("""
+        SELECT EXISTS(
+            SELECT 1 FROM messages 
+            WHERE (conversationId = :conversationId OR conversationId = :normalizedId)
+              AND content = :content 
+              AND timestamp >= :minTimestamp 
+              AND timestamp <= :maxTimestamp
+        )
+    """)
+    suspend fun hasSimilarMessage(
+        conversationId: String,
+        normalizedId: String,
+        content: String,
+        minTimestamp: Long,
+        maxTimestamp: Long
+    ): Boolean
+
     @Query("""
         SELECT * FROM messages 
         WHERE senderPhoneNumber = :sender 
