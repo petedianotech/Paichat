@@ -14,77 +14,114 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+/**
+ * Solid background brush provider strictly avoiding gradients.
+ */
 val LocalThemeGradient = staticCompositionLocalOf<Brush> {
-    Brush.verticalGradient(colors = listOf(BackgroundDark, BackgroundDark))
+    Brush.verticalGradient(colors = listOf(DarkBackground, DarkBackground))
 }
 
+/**
+ * Matching Light Theme:
+ * - Background: #F6F8FC
+ * - Cards/containers: #FFFFFF
+ * - Primary blue: #1688F5
+ * - Secondary blue: #E8F1FF
+ * - Primary text: #111827
+ * - Secondary text: #5F6B7A
+ * - Borders/dividers: #D9E1EC
+ * - Selected/active: #DCEBFF
+ * - Avatar blue: #087FF0
+ * - Disabled text: #9AA5B1
+ */
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryLight,
-    onPrimary = OnPrimaryLight,
-    primaryContainer = PrimaryContainerLight,
-    onPrimaryContainer = OnPrimaryContainerLight,
-    secondary = SecondaryLight,
-    onSecondary = OnSecondaryLight,
-    secondaryContainer = SecondaryContainerLight,
-    onSecondaryContainer = OnSecondaryContainerLight,
-    error = ErrorLight,
-    onError = OnErrorLight,
+    primary = LightPrimaryBlue,
+    onPrimary = Color.White,
+    primaryContainer = LightSelectedActive,
+    onPrimaryContainer = LightTextPrimary,
+    secondary = LightSecondaryBlue,
+    onSecondary = LightTextPrimary,
+    secondaryContainer = LightSelectedActive,
+    onSecondaryContainer = LightTextPrimary,
+    tertiary = LightAvatarBlue,
+    onTertiary = Color.White,
+    background = LightBackground,
+    onBackground = LightTextPrimary,
+    surface = LightCardContainer,
+    onSurface = LightTextPrimary,
+    surfaceVariant = LightSecondaryBlue,
+    onSurfaceVariant = LightTextSecondary,
+    outline = LightBorderDivider,
+    outlineVariant = LightBorderDivider,
+    error = SemanticError,
+    onError = Color.White,
     errorContainer = ErrorContainerLight,
-    onErrorContainer = OnErrorContainerLight,
-    background = BackgroundLight,
-    onBackground = OnBackgroundLight,
-    surface = SurfaceLight,
-    onSurface = OnSurfaceLight,
-    surfaceVariant = SurfaceVariantLight,
-    onSurfaceVariant = OnSurfaceVariantLight,
-    outline = OutlineLight,
-    outlineVariant = OutlineVariantLight
+    onErrorContainer = OnErrorContainerLight
 )
 
+/**
+ * Dark Theme:
+ * - Background: #050B18
+ * - Cards/containers: #0B1424
+ * - Primary/active blue: #1688F5
+ * - Secondary blue: #29466F
+ * - Primary text: #F5F7FF
+ * - Secondary text: #A9B9E0
+ * - Borders/dividers: #263753
+ * - Avatar blue: #087FF0
+ */
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    onPrimary = OnPrimaryDark,
-    primaryContainer = PrimaryContainerDark,
-    onPrimaryContainer = OnPrimaryContainerDark,
-    secondary = SecondaryDark,
-    onSecondary = OnSecondaryDark,
-    secondaryContainer = SecondaryContainerDark,
-    onSecondaryContainer = OnSecondaryContainerDark,
-    error = ErrorDark,
-    onError = OnErrorDark,
+    primary = DarkPrimaryBlue,
+    onPrimary = Color.White,
+    primaryContainer = DarkSecondaryBlue,
+    onPrimaryContainer = DarkTextPrimary,
+    secondary = DarkSecondaryBlue,
+    onSecondary = DarkTextPrimary,
+    secondaryContainer = DarkCardContainer,
+    onSecondaryContainer = DarkTextPrimary,
+    tertiary = PaiAvatarBlue,
+    onTertiary = Color.White,
+    background = DarkBackground,
+    onBackground = DarkTextPrimary,
+    surface = DarkCardContainer,
+    onSurface = DarkTextPrimary,
+    surfaceVariant = DarkCardContainer,
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkBorderDivider,
+    outlineVariant = DarkBorderDivider,
+    error = SemanticError,
+    onError = Color.White,
     errorContainer = ErrorContainerDark,
-    onErrorContainer = OnErrorContainerDark,
-    background = BackgroundDark,
-    onBackground = OnBackgroundDark,
-    surface = SurfaceDark,
-    onSurface = OnSurfaceDark,
-    surfaceVariant = SurfaceVariantDark,
-    onSurfaceVariant = OnSurfaceVariantDark,
-    outline = OutlineDark,
-    outlineVariant = OutlineVariantDark
+    onErrorContainer = OnErrorContainerDark
 )
 
+/**
+ * Pure AMOLED Dark Scheme:
+ * Pitch black background with exact Dark palette cards (#0B1424) and borders (#263753).
+ */
 private val AmoledDarkColorScheme = darkColorScheme(
-    primary = PrimaryDark,
-    onPrimary = OnPrimaryDark,
-    primaryContainer = Color(0xFF131A26),
-    onPrimaryContainer = Color(0xFFDBEAFE),
-    secondary = SecondaryDark,
-    onSecondary = OnSecondaryDark,
-    secondaryContainer = Color(0xFF161B22),
-    onSecondaryContainer = Color(0xFFE2E8F0),
-    error = ErrorDark,
-    onError = OnErrorDark,
-    errorContainer = Color(0xFF3B0B0C),
-    onErrorContainer = Color(0xFFFFDAD6),
+    primary = DarkPrimaryBlue,
+    onPrimary = Color.White,
+    primaryContainer = DarkSecondaryBlue,
+    onPrimaryContainer = DarkTextPrimary,
+    secondary = DarkSecondaryBlue,
+    onSecondary = DarkTextPrimary,
+    secondaryContainer = DarkCardContainer,
+    onSecondaryContainer = DarkTextPrimary,
+    tertiary = PaiAvatarBlue,
+    onTertiary = Color.White,
     background = Color(0xFF000000),
-    onBackground = Color(0xFFF1F5F9),
-    surface = Color(0xFF000000),
-    onSurface = Color(0xFFF1F5F9),
-    surfaceVariant = Color(0xFF0E1217),
-    onSurfaceVariant = Color(0xFF94A3B8),
-    outline = Color(0xFF262D37),
-    outlineVariant = Color(0xFF181E27)
+    onBackground = DarkTextPrimary,
+    surface = DarkCardContainer,
+    onSurface = DarkTextPrimary,
+    surfaceVariant = Color(0xFF000000),
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkBorderDivider,
+    outlineVariant = DarkBorderDivider,
+    error = SemanticError,
+    onError = Color.White,
+    errorContainer = ErrorContainerDark,
+    onErrorContainer = OnErrorContainerDark
 )
 
 @Composable
@@ -104,58 +141,9 @@ fun PaiChatTheme(
 
     val baseScheme = if (isAmoled) AmoledDarkColorScheme else if (isDark) DarkColorScheme else LightColorScheme
 
-    val colorScheme = when (colorTheme) {
-        "INDIGO" -> if (isDark) baseScheme.copy(
-            primary = PrimaryIndigoDark,
-            primaryContainer = if (isAmoled) Color(0xFF141738) else PrimaryIndigoContainerDark,
-            onPrimaryContainer = OnPrimaryIndigoContainerDark
-        ) else baseScheme.copy(
-            primary = PrimaryIndigoLight,
-            primaryContainer = PrimaryIndigoContainerLight,
-            onPrimaryContainer = OnPrimaryIndigoContainerLight
-        )
-        "PURPLE" -> if (isDark) baseScheme.copy(
-            primary = PrimaryPurpleDark,
-            primaryContainer = if (isAmoled) Color(0xFF1F1238) else PrimaryPurpleContainerDark,
-            onPrimaryContainer = OnPrimaryPurpleContainerDark
-        ) else baseScheme.copy(
-            primary = PrimaryPurpleLight,
-            primaryContainer = PrimaryPurpleContainerLight,
-            onPrimaryContainer = OnPrimaryPurpleContainerLight
-        )
-        "ROSE" -> if (isDark) baseScheme.copy(
-            primary = PrimaryRoseDark,
-            primaryContainer = if (isAmoled) Color(0xFF2E101B) else PrimaryRoseContainerDark,
-            onPrimaryContainer = OnPrimaryRoseContainerDark
-        ) else baseScheme.copy(
-            primary = PrimaryRoseLight,
-            primaryContainer = PrimaryRoseContainerLight,
-            onPrimaryContainer = OnPrimaryRoseContainerLight
-        )
-        "TEAL" -> if (isDark) baseScheme.copy(
-            primary = Color(0xFF2DD4BF),
-            primaryContainer = if (isAmoled) Color(0xFF062826) else Color(0xFF134E4A),
-            onPrimaryContainer = Color(0xFFCCFBF1)
-        ) else baseScheme.copy(
-            primary = Color(0xFF0D9488),
-            primaryContainer = Color(0xFFCCFBF1),
-            onPrimaryContainer = Color(0xFF115E59)
-        )
-        "AMBER" -> if (isDark) baseScheme.copy(
-            primary = Color(0xFFFBBF24),
-            primaryContainer = if (isAmoled) Color(0xFF332005) else Color(0xFF78350F),
-            onPrimaryContainer = Color(0xFFFEF3C7)
-        ) else baseScheme.copy(
-            primary = Color(0xFFD97706),
-            primaryContainer = Color(0xFFFEF3C7),
-            onPrimaryContainer = Color(0xFF92400E)
-        )
-        else -> baseScheme
-    }
-
-    // Flat solid background brush for compatibility with components referencing LocalThemeGradient
-    val solidColor = if (isAmoled) Color(0xFF000000) else if (isDark) BackgroundDark else BackgroundLight
-    val gradientBrush = Brush.verticalGradient(colors = listOf(solidColor, solidColor))
+    // Solid single-color brush strictly avoiding any gradient
+    val solidBackgroundColor = if (isAmoled) Color(0xFF000000) else if (isDark) DarkBackground else LightBackground
+    val solidBrush = Brush.verticalGradient(colors = listOf(solidBackgroundColor, solidBackgroundColor))
 
     val view = LocalView.current
     if (!view.isInEditMode) {
@@ -170,12 +158,48 @@ fun PaiChatTheme(
     }
 
     CompositionLocalProvider(
-        LocalThemeGradient provides gradientBrush
+        LocalThemeGradient provides solidBrush
     ) {
         MaterialTheme(
-            colorScheme = colorScheme,
+            colorScheme = baseScheme,
             typography = AppFonts.getDynamicTypography(fontFamily),
             content = content
         )
     }
+}
+
+/**
+ * Backward compatibility alias matching PaichatTheme (lowercase 'c').
+ */
+@Composable
+fun PaichatTheme(
+    themeMode: String = "SYSTEM",
+    colorTheme: String = "BLUE",
+    fontFamily: String = "DEFAULT",
+    content: @Composable () -> Unit
+) {
+    PaiChatTheme(
+        themeMode = themeMode,
+        colorTheme = colorTheme,
+        fontFamily = fontFamily,
+        content = content
+    )
+}
+
+/**
+ * Template compatibility alias for MyApplicationTheme.
+ */
+@Composable
+fun MyApplicationTheme(
+    themeMode: String = "SYSTEM",
+    colorTheme: String = "BLUE",
+    fontFamily: String = "DEFAULT",
+    content: @Composable () -> Unit
+) {
+    PaiChatTheme(
+        themeMode = themeMode,
+        colorTheme = colorTheme,
+        fontFamily = fontFamily,
+        content = content
+    )
 }

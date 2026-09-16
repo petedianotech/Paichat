@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">PaiChat</string>
+    <string name="app_title">PaiChat</string>
+    <string name="title_activity_main">PaiChat</string>
 </resources>
