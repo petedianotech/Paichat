@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.SubcomposeAsyncImage
+import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.ui.util.AvatarUtil
@@ -69,8 +69,15 @@ fun ContactAvatar(
             .background(avatarBgColor),
         contentAlignment = Alignment.Center
     ) {
+        AvatarFallbackView(
+            contactType = contactType,
+            initials = initials,
+            fontSize = fontSize,
+            size = size
+        )
+
         if (!photoUri.isNullOrBlank()) {
-            SubcomposeAsyncImage(
+            AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(photoUri)
                     .crossfade(true)
@@ -79,30 +86,7 @@ fun ContactAvatar(
                     .build(),
                 contentDescription = "Avatar for $displayName",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-                loading = {
-                    AvatarFallbackView(
-                        contactType = contactType,
-                        initials = initials,
-                        fontSize = fontSize,
-                        size = size
-                    )
-                },
-                error = {
-                    AvatarFallbackView(
-                        contactType = contactType,
-                        initials = initials,
-                        fontSize = fontSize,
-                        size = size
-                    )
-                }
-            )
-        } else {
-            AvatarFallbackView(
-                contactType = contactType,
-                initials = initials,
-                fontSize = fontSize,
-                size = size
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
