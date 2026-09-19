@@ -1,10 +1,12 @@
 package com.example.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
 import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.unit.sp
 import com.example.R
 
 object AppFonts {
@@ -55,11 +57,14 @@ object AppFonts {
     )
 
     val fontsList = listOf(
-        FontOption("INTER", "Inter (Default)"),
+        FontOption("DEFAULT", "Inter (Default)"),
         FontOption("ROBOTO_FLEX", "Roboto Flex"),
         FontOption("MANROPE", "Manrope"),
         FontOption("PLUS_JAKARTA", "Plus Jakarta Sans"),
-        FontOption("DM_SANS", "DM Sans")
+        FontOption("DM_SANS", "DM Sans"),
+        FontOption("SERIF", "Serif"),
+        FontOption("MONOSPACE", "Monospace"),
+        FontOption("SANS_SERIF", "Sans-Serif")
     )
 
     fun getFontFamily(key: String): FontFamily {
@@ -68,29 +73,56 @@ object AppFonts {
             "MANROPE" -> ManropeFontFamily
             "PLUS_JAKARTA" -> PlusJakartaFontFamily
             "DM_SANS" -> DmSansFontFamily
+            "SERIF" -> FontFamily.Serif
+            "MONOSPACE" -> FontFamily.Monospace
+            "SANS_SERIF" -> FontFamily.SansSerif
+            "DEFAULT", "INTER" -> InterFontFamily
             else -> InterFontFamily
         }
     }
 
-    fun getDynamicTypography(key: String): Typography {
-        val fontFamily = getFontFamily(key)
+    fun getFontSizeScale(sizeKey: String): androidx.compose.ui.unit.TextUnit? {
+        return null
+    }
+
+    fun getScaleFactor(sizeKey: String): Float {
+        return when (sizeKey.uppercase()) {
+            "SMALL" -> 0.85f
+            "LARGE" -> 1.15f
+            "EXTRA_LARGE" -> 1.30f
+            else -> 1.0f // "NORMAL"
+        }
+    }
+
+    fun getDynamicTypography(fontKey: String = "DEFAULT", fontSizeKey: String = "NORMAL"): Typography {
+        val fontFamily = getFontFamily(fontKey)
+        val scale = getScaleFactor(fontSizeKey)
         val base = Typography
+
+        fun scaleStyle(style: TextStyle): TextStyle {
+            return style.copy(
+                fontFamily = fontFamily,
+                fontSize = (style.fontSize.value * scale).sp,
+                lineHeight = (style.lineHeight.value * scale).sp
+            )
+        }
+
         return Typography(
-            displayLarge = base.displayLarge.copy(fontFamily = fontFamily),
-            displayMedium = base.displayMedium.copy(fontFamily = fontFamily),
-            displaySmall = base.displaySmall.copy(fontFamily = fontFamily),
-            headlineLarge = base.headlineLarge.copy(fontFamily = fontFamily),
-            headlineMedium = base.headlineMedium.copy(fontFamily = fontFamily),
-            headlineSmall = base.headlineSmall.copy(fontFamily = fontFamily),
-            titleLarge = base.titleLarge.copy(fontFamily = fontFamily),
-            titleMedium = base.titleMedium.copy(fontFamily = fontFamily),
-            titleSmall = base.titleSmall.copy(fontFamily = fontFamily),
-            bodyLarge = base.bodyLarge.copy(fontFamily = fontFamily),
-            bodyMedium = base.bodyMedium.copy(fontFamily = fontFamily),
-            bodySmall = base.bodySmall.copy(fontFamily = fontFamily),
-            labelLarge = base.labelLarge.copy(fontFamily = fontFamily),
-            labelMedium = base.labelMedium.copy(fontFamily = fontFamily),
-            labelSmall = base.labelSmall.copy(fontFamily = fontFamily)
+            displayLarge = scaleStyle(base.displayLarge),
+            displayMedium = scaleStyle(base.displayMedium),
+            displaySmall = scaleStyle(base.displaySmall),
+            headlineLarge = scaleStyle(base.headlineLarge),
+            headlineMedium = scaleStyle(base.headlineMedium),
+            headlineSmall = scaleStyle(base.headlineSmall),
+            titleLarge = scaleStyle(base.titleLarge),
+            titleMedium = scaleStyle(base.titleMedium),
+            titleSmall = scaleStyle(base.titleSmall),
+            bodyLarge = scaleStyle(base.bodyLarge),
+            bodyMedium = scaleStyle(base.bodyMedium),
+            bodySmall = scaleStyle(base.bodySmall),
+            labelLarge = scaleStyle(base.labelLarge),
+            labelMedium = scaleStyle(base.labelMedium),
+            labelSmall = scaleStyle(base.labelSmall)
         )
     }
 }

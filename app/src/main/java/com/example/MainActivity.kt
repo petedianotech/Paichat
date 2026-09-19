@@ -39,7 +39,8 @@ class MainActivity : ComponentActivity() {
             PaiChatTheme(
                 themeMode = appSettings.themeMode,
                 colorTheme = appSettings.colorTheme,
-                fontFamily = appSettings.fontFamily
+                fontFamily = appSettings.fontFamily,
+                fontSize = appSettings.fontSize
             ) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     PulseChatNavHost(

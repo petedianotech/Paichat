@@ -65,6 +65,17 @@ class ChatViewModel(
     private val _isSearchActive = MutableStateFlow(false)
     val isSearchActive: StateFlow<Boolean> = _isSearchActive.asStateFlow()
 
+    private val _currentSearchMatchIndex = MutableStateFlow(0)
+    val currentSearchMatchIndex: StateFlow<Int> = _currentSearchMatchIndex.asStateFlow()
+
+    val matchingMessages: StateFlow<List<MessageEntity>> = combine(_messages, _searchQuery) { list, query ->
+        if (query.isBlank()) {
+            emptyList()
+        } else {
+            list.filter { it.content.contains(query, ignoreCase = true) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val filteredMessages: StateFlow<List<MessageEntity>> = combine(_messages, _searchQuery) { list, query ->
         if (query.isBlank()) {
             list
@@ -424,9 +435,9 @@ class ChatViewModel(
         }
     }
 
-    fun getContactPhotoUri(): String? {
-        val conv = _conversation.value ?: return null
-        return contactRepository.getPhotoUriForPhoneNumber(conv.phoneNumber)
+    fun getContactPhotoUri(phoneNumber: String? = null): String? {
+        val phone = phoneNumber ?: _conversation.value?.phoneNumber ?: return null
+        return contactRepository.getPhotoUriForPhoneNumber(phone)
     }
 
     fun getResolvedName(phone: String?): String? {
@@ -474,6 +485,7 @@ class ChatViewModel(
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
+        _currentSearchMatchIndex.value = 0
     }
 
     fun toggleSearch(active: Boolean? = null) {
@@ -481,11 +493,28 @@ class ChatViewModel(
         _isSearchActive.value = newState
         if (!newState) {
             _searchQuery.value = ""
+            _currentSearchMatchIndex.value = 0
         }
     }
 
     fun clearSearch() {
         _searchQuery.value = ""
+        _currentSearchMatchIndex.value = 0
+    }
+
+    fun nextSearchMatch() {
+        val matches = matchingMessages.value
+        if (matches.isNotEmpty()) {
+            _currentSearchMatchIndex.value = (_currentSearchMatchIndex.value + 1) % matches.size
+        }
+    }
+
+    fun previousSearchMatch() {
+        val matches = matchingMessages.value
+        if (matches.isNotEmpty()) {
+            val curr = _currentSearchMatchIndex.value
+            _currentSearchMatchIndex.value = if (curr - 1 < 0) matches.size - 1 else curr - 1
+        }
     }
 
     fun sendMediaAttachment(context: Context, uriString: String, caption: String? = null) {

@@ -76,6 +76,7 @@ import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
@@ -173,6 +174,8 @@ fun ChatThreadScreen(
     val delayedSendState by viewModel.delayedSendState.collectAsState()
     val isSearchActive by viewModel.isSearchActive.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val currentSearchMatchIndex by viewModel.currentSearchMatchIndex.collectAsState()
+    val matchingMessages by viewModel.matchingMessages.collectAsState()
     val filteredMessages by viewModel.filteredMessages.collectAsState()
     val isMuted by viewModel.isMuted.collectAsState()
 
@@ -334,6 +337,12 @@ fun ChatThreadScreen(
     val activeWallpaper = ChatWallpapers.getWallpaperById(activeWallpaperId)
 
     val contactsMap by viewModel.contactsMap.collectAsState()
+    val currentPhone = conversation?.phoneNumber ?: ""
+    val contactPhotoUri = remember(currentPhone, contactsMap, conversation) {
+        contactsMap[currentPhone]?.photoUri
+            ?: contactsMap[PhoneNumberUtil.normalize(currentPhone)]?.photoUri
+            ?: viewModel.getContactPhotoUri(currentPhone)
+    }
     val contactDisplayName = remember(conversation, conversation?.contactName, conversation?.phoneNumber, contactsMap) {
         val phone = conversation?.phoneNumber
         val deviceName = viewModel.getResolvedName(phone)
@@ -342,6 +351,19 @@ fun ChatThreadScreen(
     val phone = conversation?.phoneNumber
     val isSavedOnDevice = remember(phone, contactsMap) { viewModel.isContactSaved(phone) }
     val avatarColor = AvatarUtil.getAvatarColor(conversation?.phoneNumber ?: "")
+
+    // Auto-scroll to active search match
+    LaunchedEffect(currentSearchMatchIndex, matchingMessages, isSearchActive) {
+        if (isSearchActive && matchingMessages.isNotEmpty()) {
+            val targetMsg = matchingMessages.getOrNull(currentSearchMatchIndex)
+            if (targetMsg != null) {
+                val idx = filteredMessages.indexOfFirst { it.messageId == targetMsg.messageId }
+                if (idx >= 0) {
+                    listState.animateScrollToItem(idx)
+                }
+            }
+        }
+    }
 
     // SMS Segment Calculator
     val textLen = inputText.length
@@ -458,6 +480,105 @@ fun ChatThreadScreen(
                             }
                         }
                     )
+                } else if (isSearchActive) {
+                    TopAppBar(
+                        title = {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                                    .padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                BasicTextField(
+                                    value = searchQuery,
+                                    onValueChange = { viewModel.setSearchQuery(it) },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    decorationBox = { innerTextField ->
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                text = "Search in thread...",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                )
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { viewModel.clearSearch() },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear search",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { viewModel.toggleSearch(false) }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close Search")
+                            }
+                        },
+                        actions = {
+                            if (searchQuery.isNotEmpty()) {
+                                val matchCount = matchingMessages.size
+                                val matchText = if (matchCount > 0) "${currentSearchMatchIndex + 1}/$matchCount" else "0/0"
+                                Text(
+                                    text = matchText,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (matchCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                                IconButton(
+                                    onClick = { viewModel.previousSearchMatch() },
+                                    enabled = matchCount > 0,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowUp,
+                                        contentDescription = "Previous match",
+                                        tint = if (matchCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.nextSearchMatch() },
+                                    enabled = matchCount > 0,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Next match",
+                                        tint = if (matchCount > 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    )
+                                }
+                            } else {
+                                IconButton(onClick = { viewModel.toggleSearch(false) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close Search")
+                                }
+                            }
+                        }
+                    )
                 } else {
                     val phone = conversation?.phoneNumber
                     val name = conversation?.contactName
@@ -477,9 +598,9 @@ fun ChatThreadScreen(
                                         .padding(vertical = 4.dp, horizontal = 2.dp)
                                 ) {
                                     ContactAvatar(
-                                        photoUri = viewModel.getContactPhotoUri(),
+                                        photoUri = contactPhotoUri,
                                         name = contactDisplayName,
-                                        phoneNumber = conversation?.phoneNumber ?: "",
+                                        phoneNumber = currentPhone,
                                         size = 40.dp
                                     )
 
@@ -547,8 +668,8 @@ fun ChatThreadScreen(
                                 // 2. In-Thread Deep Search Action
                                 IconButton(onClick = { viewModel.toggleSearch() }) {
                                     Icon(
-                                        imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                                        contentDescription = if (isSearchActive) "Close Search" else "Search Messages in Thread"
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = "Search Messages in Thread"
                                     )
                                 }
 
@@ -561,8 +682,6 @@ fun ChatThreadScreen(
                                     expanded = showTopMenu,
                                     onDismissRequest = { showTopMenu = false }
                                 ) {
-
-
                                     // Mute / Unmute Notifications
                                     DropdownMenuItem(
                                         text = { Text(if (isMuted) "Unmute Notifications" else "Mute Notifications") },
@@ -605,7 +724,7 @@ fun ChatThreadScreen(
                                     // Save Contact to Phone
                                     if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank() && !isSavedOnDevice) {
                                         DropdownMenuItem(
-                                            text = { Text("Save Contact to Phone") },
+                                            text = { Text("Add to Contacts") },
                                             onClick = {
                                                 showTopMenu = false
                                                 saveContactToPhone(context, phone, conversation?.contactName)
@@ -661,43 +780,6 @@ fun ChatThreadScreen(
                                 }
                             }
                         )
-
-                        // 4. Unknown Number Banner
-                        if (contactType == PhoneNumberUtil.ContactType.UNKNOWN_NUMBER && !phone.isNullOrBlank() && !isSavedOnDevice) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.PersonOutline,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Unsaved number",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    androidx.compose.material3.TextButton(
-                                        onClick = { saveContactToPhone(context, phone, null) },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text("Add to Contacts", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             },
@@ -963,74 +1045,6 @@ fun ChatThreadScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
                 ) {
-                    // Deep Thread Search Input Banner
-                    if (isSearchActive) {
-                        item {
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(16.dp),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    BasicTextField(
-                                        value = searchQuery,
-                                        onValueChange = { viewModel.setSearchQuery(it) },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true,
-                                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                        decorationBox = { innerTextField ->
-                                            if (searchQuery.isEmpty()) {
-                                                Text(
-                                                    text = "Search in thread...",
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                                )
-                                            }
-                                            innerTextField()
-                                        }
-                                    )
-                                    if (searchQuery.isNotEmpty()) {
-                                        Text(
-                                            text = "${filteredMessages.size} match${if (filteredMessages.size != 1) "es" else ""}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 6.dp)
-                                        )
-                                        IconButton(
-                                            onClick = { viewModel.clearSearch() },
-                                            modifier = Modifier.size(28.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "Clear search text",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     // Pending Scheduled Messages Banner in Thread
                     if (scheduledMessages.isNotEmpty()) {
                         item {
@@ -1127,6 +1141,7 @@ fun ChatThreadScreen(
                         val isFirstInGroup = index == 0 || filteredMessages[index - 1].senderPhoneNumber != message.senderPhoneNumber
                         val isLastInGroup = index == filteredMessages.size - 1 || filteredMessages[index + 1].senderPhoneNumber != message.senderPhoneNumber
                         val isSelected = selectedMessageIds.contains(message.messageId)
+                        val isCurrentSearchMatch = isSearchActive && matchingMessages.getOrNull(currentSearchMatchIndex)?.messageId == message.messageId
 
                         MessageBubble(
                             message = message,
@@ -1139,6 +1154,7 @@ fun ChatThreadScreen(
                             showDeliveryMarks = appSettings.deliveryReportMode in listOf("BOTH", "MARKS_ONLY") || (appSettings.deliveryReportMode == "DEFAULT" && appSettings.deliveryReports),
                             customColorHex = conversation?.customColorHex,
                             highlightQuery = searchQuery,
+                            isCurrentSearchMatch = isCurrentSearchMatch,
                             isSelectionMode = isSelectionMode,
                             isSelected = isSelected,
                             onClick = {

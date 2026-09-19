@@ -130,6 +130,7 @@ fun PaiChatTheme(
     themeMode: String = "SYSTEM",
     colorTheme: String = "BLUE",
     fontFamily: String = "DEFAULT",
+    fontSize: String = "NORMAL",
     content: @Composable () -> Unit
 ) {
     val isSystemDark = isSystemInDarkTheme()
@@ -165,7 +166,7 @@ fun PaiChatTheme(
     ) {
         MaterialTheme(
             colorScheme = baseScheme,
-            typography = AppFonts.getDynamicTypography(fontFamily),
+            typography = AppFonts.getDynamicTypography(fontFamily, fontSize),
             content = content
         )
     }
@@ -179,12 +180,14 @@ fun PaichatTheme(
     themeMode: String = "SYSTEM",
     colorTheme: String = "BLUE",
     fontFamily: String = "DEFAULT",
+    fontSize: String = "NORMAL",
     content: @Composable () -> Unit
 ) {
     PaiChatTheme(
         themeMode = themeMode,
         colorTheme = colorTheme,
         fontFamily = fontFamily,
+        fontSize = fontSize,
         content = content
     )
 }
@@ -197,12 +200,14 @@ fun MyApplicationTheme(
     themeMode: String = "SYSTEM",
     colorTheme: String = "BLUE",
     fontFamily: String = "DEFAULT",
+    fontSize: String = "NORMAL",
     content: @Composable () -> Unit
 ) {
     PaiChatTheme(
         themeMode = themeMode,
         colorTheme = colorTheme,
         fontFamily = fontFamily,
+        fontSize = fontSize,
         content = content
     )
 }

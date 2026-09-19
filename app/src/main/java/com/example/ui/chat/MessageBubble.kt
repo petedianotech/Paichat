@@ -74,6 +74,7 @@ fun MessageBubble(
     showDeliveryMarks: Boolean = true,
     customColorHex: String? = null,
     highlightQuery: String = "",
+    isCurrentSearchMatch: Boolean = false,
     isSelectionMode: Boolean = false,
     isSelected: Boolean = false,
     onClick: () -> Unit = {},
@@ -186,7 +187,11 @@ fun MessageBubble(
                 shape = shape,
                 color = backgroundColor,
                 contentColor = contentColor,
-                border = if (!isFromMe) BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+                border = when {
+                    isCurrentSearchMatch -> BorderStroke(2.dp, Color(0xFFF59E0B))
+                    !isFromMe -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    else -> null
+                },
                 tonalElevation = if (isFromMe) 0.dp else 1.dp,
                 modifier = Modifier
                     .widthIn(max = 310.dp)
