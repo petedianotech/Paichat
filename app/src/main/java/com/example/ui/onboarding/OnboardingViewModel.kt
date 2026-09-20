@@ -4,6 +4,7 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
 import android.os.Build
 import android.provider.Telephony
 import androidx.core.content.ContextCompat
@@ -65,9 +66,13 @@ class OnboardingViewModel(
         _isSyncing.value = true
         viewModelScope.launch {
             try {
-                contactRepository.syncDeviceContacts(context)
+                launch {
+                    contactRepository.syncDeviceContacts(context)
+                }
                 messageRepository.syncDeviceSms()
-            } catch (_: Exception) {}
+            } catch (exception: Exception) {
+                Log.e("OnboardingViewModel", "Initial SMS sync failed", exception)
+            }
             userPreferences.setOnboarded(true)
             _isSyncing.value = false
             onComplete()

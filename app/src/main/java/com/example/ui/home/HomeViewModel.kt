@@ -107,7 +107,9 @@ class HomeViewModel(
 
     fun syncSmsAndContacts(context: Context) {
         viewModelScope.launch {
-            contactRepository.syncDeviceContacts(context)
+            launch {
+                contactRepository.syncDeviceContacts(context)
+            }
             messageRepository.syncDeviceSms()
         }
     }

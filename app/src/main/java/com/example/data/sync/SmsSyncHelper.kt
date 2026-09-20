@@ -29,6 +29,11 @@ class SmsSyncHelper(
     private val contactRepository: ContactRepository,
     private val userPreferences: UserPreferences
 ) {
+    companion object {
+        private const val FIRST_PAGE_SIZE = 100
+        private const val MESSAGE_BATCH_SIZE = 500
+    }
+
     private val _syncProgress = MutableStateFlow(SyncProgress())
     val syncProgress: StateFlow<SyncProgress> = _syncProgress.asStateFlow()
 
@@ -76,7 +81,7 @@ class SmsSyncHelper(
                 isSyncing = false,
                 current = importedCount,
                 total = importedCount,
-                statusText = "Sync completed"
+                statusText = "Unable to load messages"
             )
         } finally {
             isSyncRunning.set(false)
@@ -238,14 +243,22 @@ class SmsSyncHelper(
         val typeIdx = cursor?.getColumnIndex(Telephony.Sms.TYPE) ?: -1
         val readIdx = cursor?.getColumnIndex(Telephony.Sms.READ) ?: -1
 
-        val allMessages = ArrayList<MessageEntity>(totalSms.coerceAtMost(5000))
+        val pendingMessages = ArrayList<MessageEntity>(MESSAGE_BATCH_SIZE)
         val conversationLatestMap = HashMap<String, Pair<String, Long>>()
         val conversationUnreadMap = HashMap<String, Int>()
 
         val dbIsEmpty = messageDao.getMessageCount() == 0
 
         var processed = 0
+        var importedCount = 0
         var phase1Completed = false
+
+        suspend fun flushPendingMessages() {
+            if (pendingMessages.isNotEmpty()) {
+                messageDao.insertMessagesIgnore(pendingMessages.toList())
+                pendingMessages.clear()
+            }
+        }
 
         cursor?.use { c ->
             while (c.moveToNext()) {
@@ -284,7 +297,7 @@ class SmsSyncHelper(
                             conversationUnreadMap[normalizedAddr] = (conversationUnreadMap[normalizedAddr] ?: 0) + 1
                         }
 
-                        allMessages.add(
+                        pendingMessages.add(
                             MessageEntity(
                                 messageId = "sms_${smsId}",
                                 conversationId = normalizedAddr,
@@ -296,30 +309,27 @@ class SmsSyncHelper(
                                 status = if (isFromMe) MessageStatus.SENT else MessageStatus.READ
                             )
                         )
+                        importedCount++
                     }
                 }
 
                 processed++
 
-                // PHASE 1: As soon as first 100 recent messages are read, commit top conversations immediately!
-                if (!phase1Completed && (processed >= 100 || processed == totalSms)) {
+                // Commit the first page as soon as it is available so the home screen can render.
+                if (!phase1Completed && (processed >= FIRST_PAGE_SIZE || processed == totalSms)) {
                     phase1Completed = true
+                    flushPendingMessages()
                     commitConversationsSnapshot(conversationLatestMap, conversationUnreadMap)
-                    messageDao.insertMessagesIgnore(allMessages.toList())
+                } else if (pendingMessages.size >= MESSAGE_BATCH_SIZE) {
+                    flushPendingMessages()
+                    commitConversationsSnapshot(conversationLatestMap, conversationUnreadMap)
                 }
             }
         }
 
-        // Final full commit for all conversations and remaining messages
+        flushPendingMessages()
         commitConversationsSnapshot(conversationLatestMap, conversationUnreadMap)
-
-        val batchSize = 1000
-        for (i in allMessages.indices step batchSize) {
-            val end = minOf(i + batchSize, allMessages.size)
-            messageDao.insertMessagesIgnore(allMessages.subList(i, end))
-        }
-
-        return allMessages.size
+        return importedCount
     }
 
     private suspend fun commitConversationsSnapshot(
@@ -331,8 +341,8 @@ class SmsSyncHelper(
 
         for ((address, latestInfo) in latestMap) {
             val existing = existingConversations[address]
-            val contact = contactRepository.getContactByPhoneNumber(address)
-            val resolvedName = existing?.contactName ?: contact?.name
+            val resolvedName = existing?.contactName
+                ?: contactRepository.getContactByPhoneNumber(address)?.name
 
             val unreadCount = unreadMap[address] ?: 0
 
