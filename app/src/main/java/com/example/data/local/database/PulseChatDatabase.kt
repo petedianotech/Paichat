@@ -11,11 +11,14 @@ import com.example.data.local.dao.ConversationDao
 import com.example.data.local.dao.MessageDao
 import com.example.data.local.dao.QuickResponseDao
 import com.example.data.local.dao.ScheduledMessageDao
+import com.example.data.local.dao.TrashDao
 import com.example.data.local.entity.BlockedContactEntity
 import com.example.data.local.entity.ConversationEntity
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.QuickResponseEntity
 import com.example.data.local.entity.ScheduledMessageEntity
+import com.example.data.local.entity.TrashMessageEntity
+import com.example.data.local.entity.DeletedSmsEntity
 
 @Database(
     entities = [
@@ -23,9 +26,11 @@ import com.example.data.local.entity.ScheduledMessageEntity
         MessageEntity::class,
         ScheduledMessageEntity::class,
         BlockedContactEntity::class,
-        QuickResponseEntity::class
+        QuickResponseEntity::class,
+        TrashMessageEntity::class,
+        DeletedSmsEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -36,6 +41,7 @@ abstract class PulseChatDatabase : RoomDatabase() {
     abstract fun scheduledMessageDao(): ScheduledMessageDao
     abstract fun blockedContactDao(): BlockedContactDao
     abstract fun quickResponseDao(): QuickResponseDao
+    abstract fun trashDao(): TrashDao
 
     companion object {
         @Volatile

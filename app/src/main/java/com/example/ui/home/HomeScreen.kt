@@ -104,6 +104,7 @@ fun HomeScreen(
     val currentFilter by viewModel.currentFilter.collectAsState()
     val syncProgress by viewModel.syncProgress.collectAsState()
     val drafts by viewModel.drafts.collectAsState()
+    val trash by viewModel.trash.collectAsState()
     val matchedMessages by viewModel.matchedMessages.collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -308,6 +309,24 @@ fun HomeScreen(
                             )
                         )
                     }
+
+                    FilterChip(
+                        selected = currentFilter == HomeFilter.TRASH,
+                        onClick = { viewModel.setFilter(HomeFilter.TRASH) },
+                        label = {
+                            Text(
+                                text = if (trash.isNotEmpty()) "Trash (${trash.size})" else "Trash",
+                                fontSize = 13.sp,
+                                fontWeight = if (currentFilter == HomeFilter.TRASH) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        },
+                        shape = RoundedCornerShape(20.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            selectedContainerColor = MaterialTheme.colorScheme.error,
+                            selectedLabelColor = MaterialTheme.colorScheme.onError
+                        )
+                    )
                 }
 
                 // 3. SMS Syncing / Importing Progress Indicator
@@ -391,7 +410,9 @@ fun HomeScreen(
                 }
             )
 
-            val showEmptyState = if (searchQuery.isNotBlank()) {
+            val showEmptyState = if (currentFilter == HomeFilter.TRASH) {
+                false
+            } else if (searchQuery.isNotBlank()) {
                 conversations.isEmpty() && matchedMessages.isEmpty()
             } else {
                 conversations.isEmpty()
@@ -451,6 +472,61 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 88.dp)
                 ) {
+                    if (currentFilter == HomeFilter.TRASH) {
+                        item {
+                            Text(
+                                text = "Deleted SMS",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+                            )
+                        }
+                        if (trash.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "Trash is empty",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                        } else {
+                            items(trash, key = { "trash_${it.messageId}" }) { deleted ->
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colorScheme.surface
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = deleted.senderPhoneNumber.ifBlank { deleted.recipientPhoneNumber },
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = deleted.content,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        TextButton(onClick = { viewModel.restoreFromTrash(deleted) }) {
+                                            Text("Restore")
+                                        }
+                                        TextButton(onClick = { viewModel.permanentlyDeleteFromTrash(deleted) }) {
+                                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
                     if (searchQuery.isNotBlank()) {
                         // SEARCH MODE
                         if (conversations.isNotEmpty()) {

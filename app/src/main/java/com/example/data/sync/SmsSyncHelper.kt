@@ -7,6 +7,7 @@ import android.provider.Telephony
 import androidx.core.content.ContextCompat
 import com.example.data.local.dao.ConversationDao
 import com.example.data.local.dao.MessageDao
+import com.example.data.local.dao.TrashDao
 import com.example.data.local.entity.ConversationEntity
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
@@ -27,7 +28,8 @@ class SmsSyncHelper(
     private val conversationDao: ConversationDao,
     private val messageDao: MessageDao,
     private val contactRepository: ContactRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val trashDao: TrashDao? = null
 ) {
     companion object {
         private const val FIRST_PAGE_SIZE = 100
@@ -52,6 +54,7 @@ class SmsSyncHelper(
 
         var importedCount = 0
         try {
+            val deletedSmsIds = trashDao?.getDeletedSmsIds()?.toHashSet().orEmpty()
             val lastSyncTimestamp = if (forceFullRescan) 0L else userPreferences.appSettings.value.lastSmsSyncTimestamp
             val hasExistingConversations = conversationDao.getAllConversationsDirect().isNotEmpty()
 
@@ -60,10 +63,10 @@ class SmsSyncHelper(
             if (isIncrementalSync) {
                 // FAST DELTA SYNC: Only fetch messages newer than last sync (with 60s safety buffer for clock drift)
                 val sinceTimestamp = (lastSyncTimestamp - 60_000L).coerceAtLeast(0L)
-                importedCount = performDeltaSync(sinceTimestamp)
+                importedCount = performDeltaSync(sinceTimestamp, deletedSmsIds)
             } else {
                 // FIRST TIME / FULL SYNC: Two-Stage Fast Priority Pipeline (Google Messages / Textra style)
-                importedCount = performTwoStageFullSync()
+                importedCount = performTwoStageFullSync(deletedSmsIds)
             }
 
             userPreferences.setLastSmsSyncTimestamp(System.currentTimeMillis())
@@ -93,7 +96,7 @@ class SmsSyncHelper(
      * Fast Delta Sync for routine app launches: only queries messages arrived/sent since last sync.
      * Completes in <30ms without causing any list flickering.
      */
-    private suspend fun performDeltaSync(sinceTimestamp: Long): Int {
+    private suspend fun performDeltaSync(sinceTimestamp: Long, deletedSmsIds: Set<String>): Int {
         val projection = arrayOf(
             Telephony.Sms._ID,
             Telephony.Sms.ADDRESS,
@@ -126,6 +129,7 @@ class SmsSyncHelper(
 
             while (c.moveToNext()) {
                 val smsId = if (idIdx >= 0) c.getLong(idIdx) else continue
+                if ("sms_$smsId" in deletedSmsIds) continue
                 val address = if (addressIdx >= 0) c.getString(addressIdx) else null
                 val body = if (bodyIdx >= 0) c.getString(bodyIdx) else ""
                 val date = if (dateIdx >= 0) c.getLong(dateIdx) else System.currentTimeMillis()
@@ -210,7 +214,7 @@ class SmsSyncHelper(
      * Phase 1: Reads top 100 most recent messages and inserts them instantly (~50ms) so the UI is immediately ready.
      * Phase 2: Smoothly imports remaining historical messages in the background without UI stutter.
      */
-    private suspend fun performTwoStageFullSync(): Int {
+    private suspend fun performTwoStageFullSync(deletedSmsIds: Set<String>): Int {
         _syncProgress.value = SyncProgress(isSyncing = true, current = 0, total = 0, statusText = "Preparing inbox...")
 
         val projection = arrayOf(
@@ -263,6 +267,7 @@ class SmsSyncHelper(
         cursor?.use { c ->
             while (c.moveToNext()) {
                 val smsId = if (idIdx >= 0) c.getLong(idIdx) else continue
+                if ("sms_$smsId" in deletedSmsIds) continue
                 val address = if (addressIdx >= 0) c.getString(addressIdx) else null
                 val body = if (bodyIdx >= 0) c.getString(bodyIdx) else ""
                 val date = if (dateIdx >= 0) c.getLong(dateIdx) else System.currentTimeMillis()

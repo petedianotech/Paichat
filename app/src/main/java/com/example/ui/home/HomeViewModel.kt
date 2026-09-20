@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.ConversationEntity
 import com.example.data.local.entity.MessageEntity
+import com.example.data.local.entity.TrashMessageEntity
 import com.example.data.model.SyncProgress
 import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
@@ -25,7 +26,8 @@ enum class HomeFilter {
     ALL,
     UNREAD,
     PINNED,
-    DRAFTS
+    DRAFTS,
+    TRASH
 }
 
 class HomeViewModel(
@@ -38,6 +40,8 @@ class HomeViewModel(
     val syncProgress: StateFlow<SyncProgress> = messageRepository.syncProgress
     val contactsMap = contactRepository.contactsMap
     val drafts = DraftManager.drafts
+    val trash: StateFlow<List<TrashMessageEntity>> = messageRepository.getTrash()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -66,6 +70,7 @@ class HomeViewModel(
             HomeFilter.UNREAD -> queryFiltered.filter { it.unreadCount > 0 }
             HomeFilter.PINNED -> queryFiltered.filter { it.isPinned }
             HomeFilter.DRAFTS -> queryFiltered.filter { !draftMap[it.conversationId].isNullOrBlank() }
+            HomeFilter.TRASH -> emptyList()
         }
     }.stateIn(
         scope = viewModelScope,
@@ -166,6 +171,14 @@ class HomeViewModel(
                 onUndoAvailable {
                     viewModelScope.launch {
                         messageRepository.restoreConversationAndMessages(conv, msgs)
+                    }
+
+                    fun restoreFromTrash(message: TrashMessageEntity) {
+                        viewModelScope.launch { messageRepository.restoreFromTrash(message) }
+                    }
+
+                    fun permanentlyDeleteFromTrash(message: TrashMessageEntity) {
+                        viewModelScope.launch { messageRepository.permanentlyDeleteFromTrash(message) }
                     }
                 }
             }
