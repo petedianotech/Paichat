@@ -110,6 +110,7 @@ class SmsSyncHelper(
         val newMessages = ArrayList<MessageEntity>(50)
         val latestByAddress = HashMap<String, Pair<String, Long>>()
         val unreadByAddress = HashMap<String, Int>()
+        val deletedSmsIds = getDeletedSmsIdsSafe()
 
         cursor?.use { c ->
             val idIdx = c.getColumnIndex(Telephony.Sms._ID)
@@ -121,6 +122,9 @@ class SmsSyncHelper(
 
             while (c.moveToNext()) {
                 val smsId = if (idIdx >= 0) c.getLong(idIdx) else continue
+                if (deletedSmsIds.contains("sms_$smsId") || deletedSmsIds.contains(smsId.toString())) {
+                    continue
+                }
                 val address = if (addressIdx >= 0) c.getString(addressIdx) else null
                 val body = if (bodyIdx >= 0) c.getString(bodyIdx) else ""
                 val date = if (dateIdx >= 0) c.getLong(dateIdx) else System.currentTimeMillis()
@@ -245,10 +249,14 @@ class SmsSyncHelper(
         var totalImported = 0
         var processed = 0
         var phase1Completed = false
+        val deletedSmsIds = getDeletedSmsIdsSafe()
 
         cursor?.use { c ->
             while (c.moveToNext()) {
                 val smsId = if (idIdx >= 0) c.getLong(idIdx) else continue
+                if (deletedSmsIds.contains("sms_$smsId") || deletedSmsIds.contains(smsId.toString())) {
+                    continue
+                }
                 val address = if (addressIdx >= 0) c.getString(addressIdx) else null
                 val body = if (bodyIdx >= 0) c.getString(bodyIdx) else ""
                 val date = if (dateIdx >= 0) c.getLong(dateIdx) else System.currentTimeMillis()
@@ -344,6 +352,14 @@ class SmsSyncHelper(
 
         if (conversationsToInsert.isNotEmpty()) {
             conversationDao.insertConversations(conversationsToInsert)
+        }
+    }
+
+    private suspend fun getDeletedSmsIdsSafe(): Set<String> {
+        return try {
+            com.example.data.local.database.PulseChatDatabase.getDatabase(context).trashDao().getDeletedSmsIds().toSet()
+        } catch (_: Exception) {
+            emptySet()
         }
     }
 }

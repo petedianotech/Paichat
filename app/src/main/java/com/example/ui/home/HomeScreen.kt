@@ -541,8 +541,7 @@ fun HomeScreen(
                                 HorizontalDivider()
                             }
                         }
-                    }
-                    if (searchQuery.isNotBlank()) {
+                    } else if (searchQuery.isNotBlank()) {
                         // SEARCH MODE
                         if (conversations.isNotEmpty()) {
                             item {

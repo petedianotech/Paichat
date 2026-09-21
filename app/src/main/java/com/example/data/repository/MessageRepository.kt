@@ -16,13 +16,17 @@ import com.example.data.local.dao.ConversationDao
 import com.example.data.local.dao.MessageDao
 import com.example.data.local.dao.QuickResponseDao
 import com.example.data.local.dao.ScheduledMessageDao
+import com.example.data.local.dao.TrashDao
+import com.example.data.local.database.PulseChatDatabase
 import com.example.data.local.entity.BlockedContactEntity
 import com.example.data.local.entity.ConversationEntity
+import com.example.data.local.entity.DeletedSmsEntity
 import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.MessageStatus
 import com.example.data.local.entity.MessageType
 import com.example.data.local.entity.QuickResponseEntity
 import com.example.data.local.entity.ScheduledMessageEntity
+import com.example.data.local.entity.TrashMessageEntity
 import com.example.data.model.SyncProgress
 import com.example.data.sync.SmsSyncHelper
 import com.example.data.util.DeviceSmsDeleter
@@ -46,9 +50,13 @@ class MessageRepository(
     private val blockedContactDao: BlockedContactDao,
     private val quickResponseDao: QuickResponseDao,
     private val contactRepository: ContactRepository,
-    private val userPreferences: com.example.data.preference.UserPreferences
+    private val userPreferences: com.example.data.preference.UserPreferences,
+    private val trashDao: TrashDao? = null
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
+    private val actualTrashDao: TrashDao by lazy {
+        trashDao ?: PulseChatDatabase.getDatabase(context).trashDao()
+    }
     private val smsSyncHelper = SmsSyncHelper(context, conversationDao, messageDao, contactRepository, userPreferences)
 
     val syncProgress: StateFlow<SyncProgress> = smsSyncHelper.syncProgress
@@ -596,12 +604,46 @@ class MessageRepository(
     suspend fun moveMessageToBin(messageId: String) {
         val timestamp = System.currentTimeMillis()
         messageDao.moveMessageToBin(messageId, timestamp)
+        val msg = messageDao.getMessageById(messageId)
+        if (msg != null) {
+            actualTrashDao.insertTrashMessages(listOf(
+                TrashMessageEntity(
+                    messageId = msg.messageId,
+                    conversationId = msg.conversationId,
+                    senderPhoneNumber = msg.senderPhoneNumber,
+                    recipientPhoneNumber = msg.recipientPhoneNumber,
+                    content = msg.content,
+                    timestamp = msg.timestamp,
+                    messageType = msg.messageType,
+                    status = msg.status,
+                    mediaUrl = msg.mediaUrl,
+                    deletedAt = timestamp
+                )
+            ))
+        }
     }
 
     suspend fun moveMessagesToBin(messageIds: Collection<String>) {
         if (messageIds.isEmpty()) return
         val timestamp = System.currentTimeMillis()
         messageDao.moveMessagesToBin(messageIds.toList(), timestamp)
+        val msgs = messageDao.getMessagesByIds(messageIds.toList())
+        if (msgs.isNotEmpty()) {
+            actualTrashDao.insertTrashMessages(msgs.map { msg ->
+                TrashMessageEntity(
+                    messageId = msg.messageId,
+                    conversationId = msg.conversationId,
+                    senderPhoneNumber = msg.senderPhoneNumber,
+                    recipientPhoneNumber = msg.recipientPhoneNumber,
+                    content = msg.content,
+                    timestamp = msg.timestamp,
+                    messageType = msg.messageType,
+                    status = msg.status,
+                    mediaUrl = msg.mediaUrl,
+                    deletedAt = timestamp
+                )
+            })
+        }
     }
 
     suspend fun moveConversationToBin(conversationId: String) {
@@ -609,17 +651,39 @@ class MessageRepository(
         val normalizedId = PhoneNumberUtil.normalize(conversationId)
         conversationDao.moveConversationToBin(conversationId, timestamp)
         messageDao.moveConversationMessagesToBin(conversationId, normalizedId, timestamp)
+        val msgs = getMessagesDirect(conversationId)
+        if (msgs.isNotEmpty()) {
+            actualTrashDao.insertTrashMessages(msgs.map { msg ->
+                TrashMessageEntity(
+                    messageId = msg.messageId,
+                    conversationId = msg.conversationId,
+                    senderPhoneNumber = msg.senderPhoneNumber,
+                    recipientPhoneNumber = msg.recipientPhoneNumber,
+                    content = msg.content,
+                    timestamp = msg.timestamp,
+                    messageType = msg.messageType,
+                    status = msg.status,
+                    mediaUrl = msg.mediaUrl,
+                    deletedAt = timestamp
+                )
+            })
+        }
     }
 
     suspend fun restoreMessagesFromBin(messageIds: Collection<String>) {
         if (messageIds.isEmpty()) return
         messageDao.restoreMessagesFromBin(messageIds.toList())
+        actualTrashDao.deleteTrashMessages(messageIds.toList())
     }
 
     suspend fun restoreConversationFromBin(conversationId: String) {
         val normalizedId = PhoneNumberUtil.normalize(conversationId)
         conversationDao.restoreConversationFromBin(conversationId)
         messageDao.restoreConversationMessagesFromBin(conversationId, normalizedId)
+        val msgs = getMessagesDirect(conversationId)
+        if (msgs.isNotEmpty()) {
+            actualTrashDao.deleteTrashMessages(msgs.map { it.messageId })
+        }
     }
 
     suspend fun permanentlyDeleteMessages(
@@ -638,6 +702,8 @@ class MessageRepository(
             }
         }
 
+        actualTrashDao.deleteTrashMessages(idList)
+        actualTrashDao.insertDeletedSms(idList.map { DeletedSmsEntity(it, System.currentTimeMillis()) })
         messageDao.permanentlyDeleteMessages(idList)
     }
 
@@ -657,6 +723,12 @@ class MessageRepository(
             }
         }
 
+        val msgs = getMessagesDirect(conversationId)
+        if (msgs.isNotEmpty()) {
+            val idList = msgs.map { it.messageId }
+            actualTrashDao.deleteTrashMessages(idList)
+            actualTrashDao.insertDeletedSms(idList.map { DeletedSmsEntity(it, System.currentTimeMillis()) })
+        }
         messageDao.deleteMessagesForConversation(conversationId)
         messageDao.deleteMessagesForConversation(normalizedId)
         conversationDao.permanentlyDeleteConversation(conversationId)
@@ -677,7 +749,86 @@ class MessageRepository(
             }
         }
 
+        val binMessages = messageDao.getMessagesInBinDirect()
+        if (binMessages.isNotEmpty()) {
+            val idList = binMessages.map { it.messageId }
+            actualTrashDao.deleteTrashMessages(idList)
+            actualTrashDao.insertDeletedSms(idList.map { DeletedSmsEntity(it, System.currentTimeMillis()) })
+        }
         messageDao.emptyBin()
         conversationDao.emptyConversationBin()
+    }
+
+    // ==========================================
+    // TRASH / BIN INTEGRATION FOR HOME VIEW
+    // ==========================================
+
+    fun getTrash(): Flow<List<TrashMessageEntity>> = actualTrashDao.getTrash()
+
+    suspend fun restoreFromTrash(message: TrashMessageEntity) {
+        actualTrashDao.deleteTrashMessage(message.messageId)
+        val restoredMessage = MessageEntity(
+            messageId = message.messageId,
+            conversationId = message.conversationId,
+            senderPhoneNumber = message.senderPhoneNumber,
+            recipientPhoneNumber = message.recipientPhoneNumber,
+            content = message.content,
+            timestamp = message.timestamp,
+            messageType = message.messageType,
+            status = message.status,
+            mediaUrl = message.mediaUrl,
+            isInBin = false,
+            deletedTimestamp = 0
+        )
+        messageDao.insertMessage(restoredMessage)
+        messageDao.restoreMessagesFromBin(listOf(message.messageId))
+
+        val conv = conversationDao.getConversationByIdDirect(message.conversationId)
+        if (conv != null) {
+            conversationDao.restoreConversationFromBin(message.conversationId)
+            conversationDao.updateConversation(
+                conv.copy(
+                    isInBin = false,
+                    deletedTimestamp = 0L,
+                    lastMessage = message.content,
+                    lastMessageTimestamp = message.timestamp
+                )
+            )
+        } else {
+            val phone = if (message.senderPhoneNumber == "ME") message.recipientPhoneNumber else message.senderPhoneNumber
+            val newConv = ConversationEntity(
+                conversationId = message.conversationId,
+                phoneNumber = phone,
+                contactName = null,
+                lastMessage = message.content,
+                lastMessageTimestamp = message.timestamp,
+                unreadCount = 0,
+                isInBin = false,
+                deletedTimestamp = 0L
+            )
+            conversationDao.insertConversation(newConv)
+        }
+    }
+
+    suspend fun permanentlyDeleteFromTrash(message: TrashMessageEntity) {
+        actualTrashDao.deleteTrashMessage(message.messageId)
+        actualTrashDao.insertDeletedSms(listOf(DeletedSmsEntity(message.messageId, System.currentTimeMillis())))
+        messageDao.permanentlyDeleteMessages(listOf(message.messageId))
+
+        val dummyMsg = MessageEntity(
+            messageId = message.messageId,
+            conversationId = message.conversationId,
+            senderPhoneNumber = message.senderPhoneNumber,
+            recipientPhoneNumber = message.recipientPhoneNumber,
+            content = message.content,
+            timestamp = message.timestamp,
+            messageType = message.messageType,
+            status = message.status
+        )
+        try {
+            DeviceSmsDeleter.deleteMessageFromDevice(context, dummyMsg)
+        } catch (e: Exception) {
+            android.util.Log.e("MessageRepo", "Device storage deletion error: ${e.message}")
+        }
     }
 }

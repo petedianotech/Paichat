@@ -43,7 +43,8 @@ class PulseChatApp : Application() {
             blockedContactDao = database.blockedContactDao(),
             quickResponseDao = database.quickResponseDao(),
             contactRepository = contactRepository,
-            userPreferences = userPreferences
+            userPreferences = userPreferences,
+            trashDao = database.trashDao()
         )
     }
 

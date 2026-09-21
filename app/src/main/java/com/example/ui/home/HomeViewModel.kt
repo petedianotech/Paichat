@@ -172,16 +172,20 @@ class HomeViewModel(
                     viewModelScope.launch {
                         messageRepository.restoreConversationAndMessages(conv, msgs)
                     }
-
-                    fun restoreFromTrash(message: TrashMessageEntity) {
-                        viewModelScope.launch { messageRepository.restoreFromTrash(message) }
-                    }
-
-                    fun permanentlyDeleteFromTrash(message: TrashMessageEntity) {
-                        viewModelScope.launch { messageRepository.permanentlyDeleteFromTrash(message) }
-                    }
                 }
             }
+        }
+    }
+
+    fun restoreFromTrash(message: TrashMessageEntity) {
+        viewModelScope.launch {
+            messageRepository.restoreFromTrash(message)
+        }
+    }
+
+    fun permanentlyDeleteFromTrash(message: TrashMessageEntity) {
+        viewModelScope.launch {
+            messageRepository.permanentlyDeleteFromTrash(message)
         }
     }
 }
