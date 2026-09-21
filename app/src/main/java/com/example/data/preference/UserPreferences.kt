@@ -14,6 +14,7 @@ data class AppSettings(
     val sendDelaySeconds: Int = 3, // 0 (off), 1, 2, 3, 5, 10
     val deliveryReports: Boolean = true,
     val deliveryReportMode: String = "BOTH", // BOTH, MARKS_ONLY, NOTIFICATIONS_ONLY, OFF
+    val deliveryReportDuration: String = "10_SECONDS", // "10_SECONDS" (auto dismiss in 10s) or "UNTIL_SWIPED" (stay until swiped away)
     val signatureText: String = "",
     val bubbleShape: String = "ROUNDED", // ROUNDED, PILL, SQUARE
     val fontSize: String = "NORMAL", // SMALL, NORMAL, LARGE, EXTRA_LARGE
@@ -71,6 +72,7 @@ class UserPreferences(context: Context) {
             val delay = prefs.getInt("send_delay_seconds", 3)
             val delivery = prefs.getBoolean("delivery_reports", true)
             val deliveryMode = prefs.getString("delivery_report_mode", "BOTH") ?: "BOTH"
+            val deliveryDuration = prefs.getString("delivery_report_duration", "10_SECONDS") ?: "10_SECONDS"
             val sig = prefs.getString("signature_text", "") ?: ""
             val shape = prefs.getString("bubble_shape", "ROUNDED") ?: "ROUNDED"
             val font = prefs.getString("font_size", "NORMAL") ?: "NORMAL"
@@ -100,6 +102,7 @@ class UserPreferences(context: Context) {
                 sendDelaySeconds = delay,
                 deliveryReports = delivery,
                 deliveryReportMode = deliveryMode,
+                deliveryReportDuration = deliveryDuration,
                 signatureText = sig,
                 bubbleShape = shape,
                 fontSize = font,
@@ -166,6 +169,11 @@ class UserPreferences(context: Context) {
         val isEnabled = mode != "OFF"
         prefs.edit().putString("delivery_report_mode", mode).putBoolean("delivery_reports", isEnabled).apply()
         _appSettings.value = _appSettings.value.copy(deliveryReportMode = mode, deliveryReports = isEnabled)
+    }
+
+    fun setDeliveryReportDuration(duration: String) {
+        prefs.edit().putString("delivery_report_duration", duration).apply()
+        _appSettings.value = _appSettings.value.copy(deliveryReportDuration = duration)
     }
 
     fun setSignatureText(sig: String) {

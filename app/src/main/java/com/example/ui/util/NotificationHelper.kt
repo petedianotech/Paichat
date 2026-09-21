@@ -15,6 +15,8 @@ import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.receiver.NotificationActionReceiver
 
+import com.example.R
+
 object NotificationHelper {
 
     private const val CHANNEL_ID = "pulsechat_messages_channel"
@@ -35,9 +37,10 @@ object NotificationHelper {
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
             }
 
-            val deliveryChannel = NotificationChannel(DELIVERY_CHANNEL_ID, DELIVERY_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
+            val deliveryChannel = NotificationChannel(DELIVERY_CHANNEL_ID, DELIVERY_CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "SMS delivery confirmation reports"
                 enableVibration(false)
+                setShowBadge(true)
             }
 
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
@@ -241,7 +244,10 @@ object NotificationHelper {
 
     fun showDeliveryReportNotification(
         context: Context,
-        recipientPhone: String
+        recipientPhone: String,
+        recipientName: String? = null,
+        messageContent: String? = null,
+        durationSetting: String = "10_SECONDS"
     ) {
         createNotificationChannel(context)
 
@@ -251,23 +257,49 @@ object NotificationHelper {
             }
         }
 
-        val notificationId = ("delivery_$recipientPhone").hashCode()
-        val text = "SMS to $recipientPhone was successfully delivered."
+        val displayName = recipientName ?: recipientPhone
+        val notificationId = ("delivery_${recipientPhone}_${System.currentTimeMillis() % 100000}").hashCode()
+        
+        val shortContent = if (!messageContent.isNullOrBlank()) {
+            "Message to $displayName was delivered: \"${messageContent.take(50)}${if (messageContent.length > 50) "..." else ""}\""
+        } else {
+            "SMS to $displayName was delivered successfully."
+        }
 
-        val notification = NotificationCompat.Builder(context, DELIVERY_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-            .setContentTitle("SMS Delivered")
-            .setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+        // Tap to open conversation
+        val openIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("conversation_id", recipientPhone)
+        }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val openPendingIntent = PendingIntent.getActivity(context, notificationId, openIntent, flags)
+
+        val notificationBuilder = NotificationCompat.Builder(context, DELIVERY_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_delivered)
+            .setContentTitle("SMS Delivered • $displayName")
+            .setContentText(shortContent)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(shortContent))
+            .setColor(0xFF2563EB.toInt()) // PulseChat Theme Blue Primary
+            .setContentIntent(openPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
-            .setTimeoutAfter(8000) // auto dismiss in 8s
-            .build()
+
+        // Customizable duration: 10 seconds vs Stay until swiped away
+        if (durationSetting == "10_SECONDS") {
+            notificationBuilder.setTimeoutAfter(10_000L) // Stay on notification for exactly 10 seconds
+        }
 
         val notificationManager = NotificationManagerCompat.from(context)
         try {
-            notificationManager.notify(notificationId, notification)
+            notificationManager.notify(notificationId, notificationBuilder.build())
         } catch (_: SecurityException) {
             // Permission not granted
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationHelper", "Failed to show delivery notification: ${e.message}")
         }
     }
 

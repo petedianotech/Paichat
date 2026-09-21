@@ -10,7 +10,9 @@ import androidx.room.PrimaryKey
         Index(value = ["conversationId"]),
         Index(value = ["senderPhoneNumber"]),
         Index(value = ["recipientPhoneNumber"]),
-        Index(value = ["timestamp"])
+        Index(value = ["timestamp"]),
+        Index(value = ["isInBin"]),
+        Index(value = ["deletedTimestamp"])
     ]
 )
 data class MessageEntity(
@@ -22,6 +24,8 @@ data class MessageEntity(
     val timestamp: Long,
     val messageType: MessageType,
     val status: MessageStatus,
-    val mediaUrl: String? = null
+    val mediaUrl: String? = null,
+    val isInBin: Boolean = false,
+    val deletedTimestamp: Long = 0L
 )
 

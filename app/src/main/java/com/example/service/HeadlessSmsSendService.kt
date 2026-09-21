@@ -48,19 +48,7 @@ class HeadlessSmsSendService : Service() {
 
             if (!messageText.isNullOrBlank() && !recipient.isNullOrBlank()) {
                 Log.d(TAG, "Sending headless quick-response SMS to $recipient: $messageText")
-                val db = PulseChatDatabase.getDatabase(applicationContext)
-                val contactRepo = ContactRepository()
-                val prefs = com.example.data.preference.UserPreferences(applicationContext)
-                val messageRepo = MessageRepository(
-                    applicationContext,
-                    db.conversationDao(),
-                    db.messageDao(),
-                    db.scheduledMessageDao(),
-                    db.blockedContactDao(),
-                    db.quickResponseDao(),
-                    contactRepo,
-                    prefs
-                )
+                val messageRepo = com.example.PulseChatApp.getMessageRepository(applicationContext)
 
                 CoroutineScope(Dispatchers.IO).launch {
                     try {

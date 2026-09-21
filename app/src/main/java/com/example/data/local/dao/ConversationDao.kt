@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ConversationDao {
-    @Query("SELECT * FROM conversations WHERE isBlocked = 0 ORDER BY isPinned DESC, lastMessageTimestamp DESC")
+    @Query("SELECT * FROM conversations WHERE isBlocked = 0 AND isInBin = 0 ORDER BY isPinned DESC, lastMessageTimestamp DESC")
     fun getAllConversations(): Flow<List<ConversationEntity>>
 
-    @Query("SELECT * FROM conversations WHERE isBlocked = 1 ORDER BY lastMessageTimestamp DESC")
+    @Query("SELECT * FROM conversations WHERE isBlocked = 1 AND isInBin = 0 ORDER BY lastMessageTimestamp DESC")
     fun getBlockedConversations(): Flow<List<ConversationEntity>>
 
     @Query("SELECT * FROM conversations WHERE conversationId = :id")
@@ -22,7 +22,7 @@ interface ConversationDao {
     @Query("SELECT * FROM conversations WHERE conversationId = :id")
     suspend fun getConversationByIdDirect(id: String): ConversationEntity?
 
-    @Query("SELECT * FROM conversations")
+    @Query("SELECT * FROM conversations WHERE isInBin = 0")
     suspend fun getAllConversationsDirect(): List<ConversationEntity>
 
     @Query("SELECT * FROM conversations WHERE phoneNumber = :phoneNumber LIMIT 1")
@@ -60,4 +60,32 @@ interface ConversationDao {
 
     @Query("UPDATE conversations SET isInternetUser = :isInternetUser WHERE conversationId = :id")
     suspend fun updateInternetUserStatus(id: String, isInternetUser: Boolean)
+
+    // ==========================================
+    // RECYCLE BIN OPERATIONS
+    // ==========================================
+
+    @Query("SELECT * FROM conversations WHERE isInBin = 1 ORDER BY deletedTimestamp DESC, lastMessageTimestamp DESC")
+    fun getConversationsInBin(): Flow<List<ConversationEntity>>
+
+    @Query("SELECT * FROM conversations WHERE isInBin = 1 ORDER BY deletedTimestamp DESC, lastMessageTimestamp DESC")
+    suspend fun getConversationsInBinDirect(): List<ConversationEntity>
+
+    @Query("SELECT COUNT(*) FROM conversations WHERE isInBin = 1")
+    fun getBinConversationCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM conversations WHERE isInBin = 1")
+    suspend fun getBinConversationCountDirect(): Int
+
+    @Query("UPDATE conversations SET isInBin = 1, deletedTimestamp = :timestamp WHERE conversationId = :id")
+    suspend fun moveConversationToBin(id: String, timestamp: Long)
+
+    @Query("UPDATE conversations SET isInBin = 0, deletedTimestamp = 0 WHERE conversationId = :id")
+    suspend fun restoreConversationFromBin(id: String)
+
+    @Query("DELETE FROM conversations WHERE conversationId = :id")
+    suspend fun permanentlyDeleteConversation(id: String)
+
+    @Query("DELETE FROM conversations WHERE isInBin = 1")
+    suspend fun emptyConversationBin()
 }

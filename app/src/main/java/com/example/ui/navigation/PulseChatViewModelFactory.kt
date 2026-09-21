@@ -3,10 +3,7 @@ package com.example.ui.navigation
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.data.local.database.PulseChatDatabase
-import com.example.data.preference.UserPreferences
-import com.example.data.repository.ContactRepository
-import com.example.data.repository.MessageRepository
+import com.example.PulseChatApp
 import com.example.ui.chat.ChatViewModel
 import com.example.ui.home.HomeViewModel
 import com.example.ui.newchat.NewChatViewModel
@@ -18,22 +15,9 @@ class PulseChatViewModelFactory(
     private val conversationId: String? = null
 ) : ViewModelProvider.Factory {
 
-    private val userPreferences by lazy { UserPreferences(context) }
-    private val contactRepository by lazy { ContactRepository() }
-    private val database by lazy { PulseChatDatabase.getDatabase(context) }
-    private val messageRepository by lazy {
-        MessageRepository(
-            context = context,
-            conversationDao = database.conversationDao(),
-            messageDao = database.messageDao(),
-            scheduledMessageDao = database.scheduledMessageDao(),
-            blockedContactDao = database.blockedContactDao(),
-            quickResponseDao = database.quickResponseDao(),
-            trashDao = database.trashDao(),
-            contactRepository = contactRepository,
-            userPreferences = userPreferences
-        )
-    }
+    private val userPreferences by lazy { PulseChatApp.getUserPreferences(context) }
+    private val contactRepository by lazy { PulseChatApp.getContactRepository(context) }
+    private val messageRepository by lazy { PulseChatApp.getMessageRepository(context) }
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

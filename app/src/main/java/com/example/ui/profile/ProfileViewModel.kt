@@ -8,6 +8,8 @@ import android.provider.Telephony
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.entity.BlockedContactEntity
+import com.example.data.local.entity.ConversationEntity
+import com.example.data.local.entity.MessageEntity
 import com.example.data.local.entity.ScheduledMessageEntity
 import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
@@ -37,6 +39,18 @@ class ProfileViewModel(
     val allScheduledMessages: StateFlow<List<ScheduledMessageEntity>> =
         messageRepository.getAllScheduledMessages()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val binMessages: StateFlow<List<MessageEntity>> =
+        messageRepository.getBinMessages()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val binConversations: StateFlow<List<ConversationEntity>> =
+        messageRepository.getBinConversations()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val binItemCount: StateFlow<Int> =
+        messageRepository.getBinItemCount()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val registeredContacts = contactRepository.registeredContacts
 
@@ -156,6 +170,40 @@ class ProfileViewModel(
 
     fun setUserPhoneNumber(phone: String) {
         userPreferences.setUserPhoneNumber(phone)
+    }
+
+    fun setDeliveryReportDuration(duration: String) {
+        userPreferences.setDeliveryReportDuration(duration)
+    }
+
+    fun restoreBinMessages(messageIds: Collection<String>) {
+        viewModelScope.launch {
+            messageRepository.restoreMessagesFromBin(messageIds)
+        }
+    }
+
+    fun restoreBinConversation(conversationId: String) {
+        viewModelScope.launch {
+            messageRepository.restoreConversationFromBin(conversationId)
+        }
+    }
+
+    fun permanentlyDeleteMessages(messageIds: Collection<String>, deleteFromDeviceStorage: Boolean = true) {
+        viewModelScope.launch {
+            messageRepository.permanentlyDeleteMessages(messageIds, deleteFromDeviceStorage)
+        }
+    }
+
+    fun permanentlyDeleteConversation(conversationId: String, deleteFromDeviceStorage: Boolean = true) {
+        viewModelScope.launch {
+            messageRepository.permanentlyDeleteConversation(conversationId, deleteFromDeviceStorage)
+        }
+    }
+
+    fun emptyRecycleBin(deleteFromDeviceStorage: Boolean = true) {
+        viewModelScope.launch {
+            messageRepository.emptyRecycleBin(deleteFromDeviceStorage)
+        }
     }
 
     fun setUserAvatarColor(colorHex: String) {

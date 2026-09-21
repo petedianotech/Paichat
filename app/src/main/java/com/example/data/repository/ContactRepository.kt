@@ -46,14 +46,22 @@ class ContactRepository {
         return null
     }
 
-    private val photoUriCache = ConcurrentHashMap<String, String>()
+    private val photoUriCache = android.util.LruCache<String, String>(150)
+
+    fun clearCaches() {
+        photoUriCache.evictAll()
+    }
 
     fun getPhotoUriForPhoneNumber(phoneNumber: String): String? {
         val normalized = normalizePhoneNumber(phoneNumber)
-        photoUriCache[normalized]?.let { return it }
+        synchronized(photoUriCache) {
+            photoUriCache.get(normalized)?.let { return it }
+        }
         val contactPhoto = getContactByPhoneNumber(phoneNumber)?.photoUri
         if (contactPhoto != null) {
-            photoUriCache[normalized] = contactPhoto
+            synchronized(photoUriCache) {
+                photoUriCache.put(normalized, contactPhoto)
+            }
             return contactPhoto
         }
         return null
@@ -66,11 +74,15 @@ class ContactRepository {
     fun resolveContactPhotoUri(context: Context, phoneNumber: String): String? {
         val normalized = normalizePhoneNumber(phoneNumber)
         if (normalized.isBlank()) return null
-        photoUriCache[normalized]?.let { return it }
+        synchronized(photoUriCache) {
+            photoUriCache.get(normalized)?.let { return it }
+        }
 
         val cached = getContactByPhoneNumber(phoneNumber)?.photoUri
         if (cached != null) {
-            photoUriCache[normalized] = cached
+            synchronized(photoUriCache) {
+                photoUriCache.put(normalized, cached)
+            }
             return cached
         }
 
@@ -90,7 +102,9 @@ class ContactRepository {
                     if (photoIndex >= 0) {
                         val photoUri = cursor.getString(photoIndex)
                         if (!photoUri.isNullOrBlank()) {
-                            photoUriCache[normalized] = photoUri
+                            synchronized(photoUriCache) {
+                                photoUriCache.put(normalized, photoUri)
+                            }
                             return photoUri
                         }
                     }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.remember
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Call
@@ -74,7 +75,12 @@ fun ContactDetailsSheet(
     val phoneNumber = conversation?.phoneNumber ?: ""
     val contactName = conversation?.contactName
     val displayName = contactName ?: phoneNumber.ifBlank { "Contact" }
-    val avatarColor = AvatarUtil.getAvatarColor(phoneNumber)
+    val customColor = remember(conversation?.customColorHex) {
+        conversation?.customColorHex?.let {
+            try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
+        }
+    }
+    val avatarColor = customColor ?: AvatarUtil.getAvatarColor(phoneNumber)
     val isPinned = conversation?.isPinned == true
     val isBlocked = conversation?.isBlocked == true
 

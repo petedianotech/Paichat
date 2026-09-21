@@ -13,24 +13,26 @@ import kotlinx.coroutines.flow.Flow
 interface MessageDao {
     @Query("""
         SELECT * FROM messages 
-        WHERE conversationId = :conversationId 
+        WHERE ((conversationId = :conversationId 
            OR conversationId = :normalizedId
            OR recipientPhoneNumber = :conversationId
            OR recipientPhoneNumber = :normalizedId
            OR senderPhoneNumber = :conversationId
-           OR senderPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :normalizedId))
+          AND isInBin = 0
         ORDER BY timestamp ASC
     """)
     fun getMessagesForConversationFlexible(conversationId: String, normalizedId: String): Flow<List<MessageEntity>>
 
     @Query("""
         SELECT * FROM messages 
-        WHERE conversationId = :conversationId 
+        WHERE ((conversationId = :conversationId 
            OR conversationId = :normalizedId
            OR recipientPhoneNumber = :conversationId
            OR recipientPhoneNumber = :normalizedId
            OR senderPhoneNumber = :conversationId
-           OR senderPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :normalizedId))
+          AND isInBin = 0
         ORDER BY timestamp DESC
         LIMIT :limit
     """)
@@ -42,26 +44,44 @@ interface MessageDao {
 
     @Query("""
         SELECT * FROM messages 
-        WHERE conversationId = :conversationId 
+        WHERE ((conversationId = :conversationId 
            OR conversationId = :normalizedId
            OR recipientPhoneNumber = :conversationId
            OR recipientPhoneNumber = :normalizedId
            OR senderPhoneNumber = :conversationId
-           OR senderPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :normalizedId))
+          AND isInBin = 0
         ORDER BY timestamp ASC
     """)
     suspend fun getMessagesForConversationFlexibleDirect(conversationId: String, normalizedId: String): List<MessageEntity>
 
-    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND isInBin = 0 ORDER BY timestamp ASC")
     fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>>
 
-    @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp DESC LIMIT 1")
+    @Query("""
+        SELECT * FROM messages 
+        WHERE (conversationId = :conversationId 
+           OR conversationId = :normalizedId
+           OR recipientPhoneNumber = :conversationId
+           OR recipientPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :conversationId
+           OR senderPhoneNumber = :normalizedId)
+          AND isInBin = 0 
+        ORDER BY timestamp DESC 
+        LIMIT 1
+    """)
+    suspend fun getLastMessageForConversationFlexible(conversationId: String, normalizedId: String): MessageEntity?
+
+    @Query("SELECT * FROM messages WHERE conversationId = :conversationId AND isInBin = 0 ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastMessageForConversation(conversationId: String): MessageEntity?
 
     @Query("SELECT * FROM messages WHERE messageId = :messageId")
     suspend fun getMessageById(messageId: String): MessageEntity?
 
-    @Query("SELECT COUNT(*) FROM messages")
+    @Query("SELECT * FROM messages WHERE messageId IN (:messageIds)")
+    suspend fun getMessagesByIds(messageIds: List<String>): List<MessageEntity>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE isInBin = 0")
     suspend fun getMessageCount(): Int
 
     @Query("""
@@ -86,6 +106,7 @@ interface MessageDao {
         WHERE senderPhoneNumber = :sender 
           AND content = :content 
           AND timestamp >= :sinceTimestamp 
+          AND isInBin = 0
         LIMIT 1
     """)
     suspend fun findRecentIncomingMessage(sender: String, content: String, sinceTimestamp: Long): MessageEntity?
@@ -105,7 +126,7 @@ interface MessageDao {
     @Update
     suspend fun updateMessage(message: MessageEntity)
 
-    @Query("SELECT * FROM messages WHERE content LIKE '%' || :query || '%' ORDER BY timestamp DESC LIMIT 50")
+    @Query("SELECT * FROM messages WHERE content LIKE '%' || :query || '%' AND isInBin = 0 ORDER BY timestamp DESC LIMIT 50")
     fun searchMessages(query: String): Flow<List<MessageEntity>>
 
     @Query("DELETE FROM messages WHERE messageId = :messageId")
@@ -113,4 +134,60 @@ interface MessageDao {
 
     @Query("DELETE FROM messages WHERE conversationId = :conversationId")
     suspend fun deleteMessagesForConversation(conversationId: String)
+
+    // ==========================================
+    // RECYCLE BIN OPERATIONS
+    // ==========================================
+
+    @Query("SELECT * FROM messages WHERE isInBin = 1 ORDER BY deletedTimestamp DESC, timestamp DESC")
+    fun getMessagesInBin(): Flow<List<MessageEntity>>
+
+    @Query("SELECT * FROM messages WHERE isInBin = 1 ORDER BY deletedTimestamp DESC, timestamp DESC")
+    suspend fun getMessagesInBinDirect(): List<MessageEntity>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE isInBin = 1")
+    fun getBinMessageCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE isInBin = 1")
+    suspend fun getBinMessageCountDirect(): Int
+
+    @Query("UPDATE messages SET isInBin = 1, deletedTimestamp = :timestamp WHERE messageId = :messageId")
+    suspend fun moveMessageToBin(messageId: String, timestamp: Long)
+
+    @Query("UPDATE messages SET isInBin = 1, deletedTimestamp = :timestamp WHERE messageId IN (:messageIds)")
+    suspend fun moveMessagesToBin(messageIds: List<String>, timestamp: Long)
+
+    @Query("""
+        UPDATE messages SET isInBin = 1, deletedTimestamp = :timestamp 
+        WHERE conversationId = :conversationId 
+           OR conversationId = :normalizedId
+           OR recipientPhoneNumber = :conversationId
+           OR recipientPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :conversationId
+           OR senderPhoneNumber = :normalizedId
+    """)
+    suspend fun moveConversationMessagesToBin(conversationId: String, normalizedId: String, timestamp: Long)
+
+    @Query("UPDATE messages SET isInBin = 0, deletedTimestamp = 0 WHERE messageId = :messageId")
+    suspend fun restoreMessageFromBin(messageId: String)
+
+    @Query("UPDATE messages SET isInBin = 0, deletedTimestamp = 0 WHERE messageId IN (:messageIds)")
+    suspend fun restoreMessagesFromBin(messageIds: List<String>)
+
+    @Query("""
+        UPDATE messages SET isInBin = 0, deletedTimestamp = 0 
+        WHERE conversationId = :conversationId 
+           OR conversationId = :normalizedId
+           OR recipientPhoneNumber = :conversationId
+           OR recipientPhoneNumber = :normalizedId
+           OR senderPhoneNumber = :conversationId
+           OR senderPhoneNumber = :normalizedId
+    """)
+    suspend fun restoreConversationMessagesFromBin(conversationId: String, normalizedId: String)
+
+    @Query("DELETE FROM messages WHERE messageId IN (:messageIds)")
+    suspend fun permanentlyDeleteMessages(messageIds: List<String>)
+
+    @Query("DELETE FROM messages WHERE isInBin = 1")
+    suspend fun emptyBin()
 }

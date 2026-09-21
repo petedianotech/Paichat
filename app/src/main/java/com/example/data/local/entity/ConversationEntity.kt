@@ -8,7 +8,8 @@ import androidx.room.PrimaryKey
     tableName = "conversations",
     indices = [
         Index(value = ["isBlocked", "isPinned", "lastMessageTimestamp"]),
-        Index(value = ["phoneNumber"])
+        Index(value = ["phoneNumber"]),
+        Index(value = ["isInBin"])
     ]
 )
 data class ConversationEntity(
@@ -22,5 +23,7 @@ data class ConversationEntity(
     val isPinned: Boolean = false,
     val isBlocked: Boolean = false,
     val customColorHex: String? = null,
-    val customWallpaper: String? = null
+    val customWallpaper: String? = null,
+    val isInBin: Boolean = false,
+    val deletedTimestamp: Long = 0L
 )

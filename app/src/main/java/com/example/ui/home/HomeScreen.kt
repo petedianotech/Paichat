@@ -106,6 +106,7 @@ fun HomeScreen(
     val drafts by viewModel.drafts.collectAsState()
     val trash by viewModel.trash.collectAsState()
     val matchedMessages by viewModel.matchedMessages.collectAsState()
+    val appSettings by viewModel.appSettings.collectAsState()
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         if (checkAllSmsPermissions(context)) {
@@ -210,18 +211,32 @@ fun HomeScreen(
                         }
 
                         // Profile & Settings
+                        val userAvatarBg = remember(appSettings.userAvatarColor) {
+                            try { Color(android.graphics.Color.parseColor(appSettings.userAvatarColor)) } catch (_: Exception) { null }
+                        } ?: MaterialTheme.colorScheme.primary
+                        val userInitial = remember(appSettings.userName) {
+                            appSettings.userName.trim().take(1).uppercase().ifBlank { "U" }
+                        }
                         IconButton(
                             onClick = onNavigateToProfile,
                             modifier = Modifier
                                 .size(36.dp)
                                 .testTag("home_settings_btn")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(userAvatarBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = userInitial,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
                         }
                     }
                 }

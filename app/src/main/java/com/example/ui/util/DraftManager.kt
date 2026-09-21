@@ -19,6 +19,18 @@ object DraftManager {
         }
     }
 
+    private fun ensurePrefs(): SharedPreferences? {
+        if (prefs == null) {
+            try {
+                val ctx = com.example.PulseChatApp.getInstance().applicationContext
+                prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                loadAllDrafts()
+            } catch (_: Exception) {
+            }
+        }
+        return prefs
+    }
+
     private fun loadAllDrafts() {
         val sp = prefs ?: return
         val map = mutableMapOf<String, String>()
@@ -31,11 +43,12 @@ object DraftManager {
     }
 
     fun getDraft(conversationId: String): String {
+        ensurePrefs()
         return _drafts.value[conversationId] ?: ""
     }
 
     fun saveDraft(conversationId: String, text: String) {
-        val sp = prefs ?: return
+        val sp = ensurePrefs() ?: return
         val trimmed = text.trim()
         val current = _drafts.value.toMutableMap()
         if (trimmed.isEmpty()) {

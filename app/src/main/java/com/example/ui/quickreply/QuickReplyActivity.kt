@@ -125,19 +125,9 @@ class QuickReplyActivity : ComponentActivity() {
             return
         }
 
-        val userPreferences = UserPreferences(applicationContext)
-        val database = PulseChatDatabase.getDatabase(applicationContext)
-        val contactRepository = ContactRepository()
-        val messageRepository = MessageRepository(
-            context = applicationContext,
-            conversationDao = database.conversationDao(),
-            messageDao = database.messageDao(),
-            scheduledMessageDao = database.scheduledMessageDao(),
-            blockedContactDao = database.blockedContactDao(),
-            quickResponseDao = database.quickResponseDao(),
-            contactRepository = contactRepository,
-            userPreferences = userPreferences
-        )
+        val userPreferences = com.example.PulseChatApp.getUserPreferences(applicationContext)
+        val contactRepository = com.example.PulseChatApp.getContactRepository(applicationContext)
+        val messageRepository = com.example.PulseChatApp.getMessageRepository(applicationContext)
 
         setContent {
             val appSettings by userPreferences.appSettings.collectAsState()
@@ -236,7 +226,7 @@ fun QuickReplyPopupScreen(
     }
 
     val appSettings by userPreferences.appSettings.collectAsState()
-    val messages by messageRepository.getMessagesForConversationPaged(conversationId, 25)
+    val messages by messageRepository.getMessagesForConversationDesc(conversationId, 25)
         .collectAsState(initial = emptyList())
 
     val quickResponses by messageRepository.getAllQuickResponses()
@@ -258,17 +248,10 @@ fun QuickReplyPopupScreen(
         true
     }
 
-    // Scroll to latest message when new messages arrive or keyboard opens
-    val imeHeight = WindowInsets.ime.getBottom(LocalDensity.current)
-    LaunchedEffect(imeHeight) {
-        if (imeHeight > 0 && messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
-    }
-
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    // Since reverseLayout is true, newest message (index 0) is already anchored at the bottom
+    LaunchedEffect(messages.firstOrNull()?.messageId) {
+        if (messages.isNotEmpty() && listState.firstVisibleItemIndex <= 1) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -535,48 +518,22 @@ fun QuickReplyPopupScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
+                            reverseLayout = true,
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(messages) { msg ->
+                            items(
+                                items = messages,
+                                key = { it.messageId }
+                            ) { msg ->
                                 PopupBubbleItem(msg = msg)
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // 3. Quick Response Presets
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp)
-                ) {
-                    val presets = if (quickResponses.isNotEmpty()) quickResponses.map { it.text } else listOf(
-                        "OK 👍",
-                        "On my way! 🏃",
-                        "Can't talk right now.",
-                        "Thanks!",
-                        "Call you later."
-                    )
-                    items(presets) { preset ->
-                        AssistChip(
-                            onClick = {
-                                replyText = preset
-                            },
-                            label = { Text(preset, fontSize = 12.sp) },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 4. Quick Reply Input Field & Send Action
+                // 3. Quick Reply Input Field & Send Action
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically

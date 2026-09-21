@@ -44,18 +44,25 @@ class SmsStatusReceiver : BroadcastReceiver() {
 
                     // Delivery Report Notification if customizable setting is enabled (BOTH or NOTIFICATIONS_ONLY)
                     val settings = prefs.appSettings.value
-                    val shouldNotify = settings.deliveryReportMode in listOf("BOTH", "NOTIFICATIONS_ONLY") ||
-                            (settings.deliveryReportMode == "DEFAULT" && settings.deliveryReports)
+                    val shouldNotify = settings.deliveryReports && 
+                            (settings.deliveryReportMode in listOf("BOTH", "NOTIFICATIONS_ONLY"))
 
                     if (shouldNotify) {
                         val message = messageDao.getMessageById(messageId)
-                        if (message != null) {
-                            // Show silent low-priority delivery confirmation report
-                            NotificationHelper.showDeliveryReportNotification(
-                                context = context,
-                                recipientPhone = message.recipientPhoneNumber
-                            )
-                        }
+                        val recipientPhone = message?.recipientPhoneNumber
+                            ?: intent.getStringExtra("extra_recipient_phone")
+                            ?: "Recipient"
+                        val recipientName = intent.getStringExtra("extra_recipient_name")
+                        val content = message?.content ?: intent.getStringExtra("extra_content")
+
+                        // Show delivery confirmation report notification
+                        NotificationHelper.showDeliveryReportNotification(
+                            context = context,
+                            recipientPhone = recipientPhone,
+                            recipientName = recipientName,
+                            messageContent = content,
+                            durationSetting = settings.deliveryReportDuration
+                        )
                     }
                 }
             } catch (e: Exception) {

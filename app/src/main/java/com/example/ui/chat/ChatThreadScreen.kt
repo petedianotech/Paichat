@@ -31,6 +31,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +71,10 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Image
@@ -193,12 +197,18 @@ fun ChatThreadScreen(
     var showColorPicker by remember { mutableStateOf(false) }
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showContactDetailsSheet by remember { mutableStateOf(false) }
+    var showContactPickerSheet by remember { mutableStateOf(false) }
     var showWallpaperPickerSheet by remember { mutableStateOf(false) }
     var newQuickResponseText by remember { mutableStateOf("") }
     var showAddQuickResponseDialog by remember { mutableStateOf(false) }
     var pendingActionAfterPermission by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val listState = rememberLazyListState()
+
+    // Immediately save draft if user leaves application (switches app, home button, etc.)
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
+        viewModel.saveDraftNow()
+    }
 
     // Track active conversation to suppress redundant popups while user is in this chat
     val currentConvId = conversation?.conversationId
@@ -207,6 +217,7 @@ fun ChatThreadScreen(
             com.example.ui.util.ActiveConversationTracker.activeConversationId = currentConvId
         }
         onDispose {
+            viewModel.saveDraftNow()
             if (com.example.ui.util.ActiveConversationTracker.activeConversationId == currentConvId) {
                 com.example.ui.util.ActiveConversationTracker.activeConversationId = null
             }
@@ -246,55 +257,26 @@ fun ChatThreadScreen(
         viewModel.loadSims(context)
     }
 
-    // Connect snapshotFlow to track scroll position and detect near-top for loading older messages
+    // Connect snapshotFlow to detect when user scrolls up to load older messages
     LaunchedEffect(listState) {
-        // Collect first visible item info for scroll preservation
-        launch {
-            snapshotFlow {
-                val layoutInfo = listState.layoutInfo
-                val firstVisibleItem = layoutInfo.visibleItemsInfo.firstOrNull()
-                Pair(firstVisibleItem?.key, firstVisibleItem?.offset ?: 0)
-            }.collectLatest { (key, offset) ->
-                firstVisibleItemKey = key
-                firstVisibleItemOffset = offset
-            }
-        }
-        
-        // Detect near-top scroll to trigger pagination
-        launch {
-            snapshotFlow { listState.firstVisibleItemIndex }
-                .collectLatest { firstVisibleIndex ->
-                    if (firstVisibleIndex <= 5 && messages.isNotEmpty() && !isInitialLoad) {
-                        viewModel.loadMoreMessages()
-                    }
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collectLatest { firstVisibleIndex ->
+                if (firstVisibleIndex >= messages.size - 10 && messages.isNotEmpty()) {
+                    viewModel.loadMoreMessages()
                 }
-        }
-    }
-
-    val imeBottom = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)
-    LaunchedEffect(imeBottom) {
-        if (imeBottom > 0 && messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
-        }
+            }
     }
 
     val isAtBottom = remember(listState) {
         derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val visibleItems = layoutInfo.visibleItemsInfo
-            if (visibleItems.isEmpty()) {
-                true
-            } else {
-                val lastVisibleItem = visibleItems.last()
-                lastVisibleItem.index >= layoutInfo.totalItemsCount - 2
-            }
+            listState.firstVisibleItemIndex <= 1
         }
     }
 
     val visibleDateText by remember(listState, filteredMessages) {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
-            val visibleItem = layoutInfo.visibleItemsInfo.firstOrNull { it.key is String && (it.key as String).isNotEmpty() }
+            val visibleItem = layoutInfo.visibleItemsInfo.lastOrNull { it.key is String && (it.key as String).isNotEmpty() }
             if (visibleItem != null) {
                 val key = visibleItem.key as? String
                 val msg = filteredMessages.firstOrNull { it.messageId == key }
@@ -303,32 +285,17 @@ fun ChatThreadScreen(
         }
     }
 
-    var lastMessageCount by remember { mutableStateOf(0) }
-    var lastMessageId by remember { mutableStateOf<String?>(null) }
+    var lastNewestMessageId by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(messages) {
-        if (messages.isNotEmpty()) {
-            val newLastMessage = messages.last()
-            val isNewMessageAdded = lastMessageId != null && newLastMessage.messageId != lastMessageId
-            val isFromMe = newLastMessage.senderPhoneNumber == "ME"
-
-            if (isInitialLoad) {
-                listState.scrollToItem(messages.size - 1)
-                isInitialLoad = false
-            } else if (isNewMessageAdded && (isFromMe || isAtBottom.value)) {
-                listState.animateScrollToItem(messages.size - 1)
-            } else if (messages.size > lastMessageCount) {
-                // Restore scroll position when older messages are prepended
-                val oldKey = firstVisibleItemKey
-                if (oldKey != null) {
-                    val index = messages.indexOfFirst { it.messageId == oldKey }
-                    if (index != -1) {
-                        listState.scrollToItem(index, firstVisibleItemOffset)
-                    }
-                }
+    LaunchedEffect(messages.firstOrNull()?.messageId) {
+        val newest = messages.firstOrNull()
+        if (newest != null) {
+            val isNewMessageAdded = lastNewestMessageId != null && newest.messageId != lastNewestMessageId
+            val isFromMe = newest.senderPhoneNumber == "ME"
+            if (isNewMessageAdded && (isFromMe || isAtBottom.value)) {
+                listState.scrollToItem(0)
             }
-            lastMessageId = newLastMessage.messageId
-            lastMessageCount = messages.size
+            lastNewestMessageId = newest.messageId
         }
     }
 
@@ -586,6 +553,13 @@ fun ChatThreadScreen(
                         PhoneNumberUtil.getContactType(phone, name)
                     }
 
+                    val customAvatarColor = remember(conversation?.customColorHex) {
+                        conversation?.customColorHex?.let {
+                            try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
+                        }
+                    }
+                    val appBrandColor = customAvatarColor ?: MaterialTheme.colorScheme.primary
+
                     Column(modifier = Modifier.fillMaxWidth()) {
                         TopAppBar(
                             title = {
@@ -596,11 +570,12 @@ fun ChatThreadScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { showContactDetailsSheet = true }
                                         .padding(vertical = 4.dp, horizontal = 2.dp)
-                                ) {
+                                 ) {
                                     ContactAvatar(
                                         photoUri = contactPhotoUri,
                                         name = contactDisplayName,
                                         phoneNumber = currentPhone,
+                                        customColor = customAvatarColor,
                                         size = 40.dp
                                     )
 
@@ -680,8 +655,30 @@ fun ChatThreadScreen(
 
                                 DropdownMenu(
                                     expanded = showTopMenu,
-                                    onDismissRequest = { showTopMenu = false }
+                                    onDismissRequest = { showTopMenu = false },
+                                    modifier = Modifier
+                                        .widthIn(min = 230.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(18.dp)
+                                        ),
+                                    shape = RoundedCornerShape(18.dp),
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    border = BorderStroke(1.5.dp, appBrandColor.copy(alpha = 0.6f)),
+                                    shadowElevation = 8.dp
                                 ) {
+                                    // Share Contact
+                                    DropdownMenuItem(
+                                        text = { Text("Share Contact") },
+                                        onClick = {
+                                            showTopMenu = false
+                                            showContactPickerSheet = true
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Contacts, contentDescription = null, tint = appBrandColor)
+                                        }
+                                    )
+
                                     // Mute / Unmute Notifications
                                     DropdownMenuItem(
                                         text = { Text(if (isMuted) "Unmute Notifications" else "Mute Notifications") },
@@ -694,7 +691,8 @@ fun ChatThreadScreen(
                                         leadingIcon = {
                                             Icon(
                                                 imageVector = if (isMuted) Icons.Default.Notifications else Icons.Default.NotificationsOff,
-                                                contentDescription = null
+                                                contentDescription = null,
+                                                tint = appBrandColor
                                             )
                                         }
                                     )
@@ -707,7 +705,7 @@ fun ChatThreadScreen(
                                                 showTopMenu = false
                                                 showSimPickerDialog = true
                                             },
-                                            leadingIcon = { Icon(Icons.Default.SimCard, contentDescription = null) }
+                                            leadingIcon = { Icon(Icons.Default.SimCard, contentDescription = null, tint = appBrandColor) }
                                         )
                                     }
 
@@ -718,7 +716,7 @@ fun ChatThreadScreen(
                                             showTopMenu = false
                                             showContactDetailsSheet = true
                                         },
-                                        leadingIcon = { Icon(Icons.Default.ContactPage, contentDescription = null) }
+                                        leadingIcon = { Icon(Icons.Default.ContactPage, contentDescription = null, tint = appBrandColor) }
                                     )
 
                                     // Save Contact to Phone
@@ -729,7 +727,7 @@ fun ChatThreadScreen(
                                                 showTopMenu = false
                                                 saveContactToPhone(context, phone, conversation?.contactName)
                                             },
-                                            leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null) }
+                                            leadingIcon = { Icon(Icons.Default.PersonAdd, contentDescription = null, tint = appBrandColor) }
                                         )
                                     }
 
@@ -740,7 +738,7 @@ fun ChatThreadScreen(
                                             showTopMenu = false
                                             showWallpaperPickerSheet = true
                                         },
-                                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) }
+                                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, tint = appBrandColor) }
                                     )
 
                                     // Conversation Color
@@ -750,7 +748,7 @@ fun ChatThreadScreen(
                                             showColorPicker = true
                                             showTopMenu = false
                                         },
-                                        leadingIcon = { Icon(Icons.Default.ColorLens, contentDescription = null) }
+                                        leadingIcon = { Icon(Icons.Default.ColorLens, contentDescription = null, tint = appBrandColor) }
                                     )
 
                                     // Pin / Unpin
@@ -760,7 +758,7 @@ fun ChatThreadScreen(
                                             viewModel.togglePin()
                                             showTopMenu = false
                                         },
-                                        leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null) }
+                                        leadingIcon = { Icon(Icons.Default.PushPin, contentDescription = null, tint = appBrandColor) }
                                     )
 
                                     // Block / Unblock Number
@@ -775,7 +773,7 @@ fun ChatThreadScreen(
                                                 onNavigateBack()
                                             }
                                         },
-                                        leadingIcon = { Icon(Icons.Default.Block, contentDescription = null) }
+                                        leadingIcon = { Icon(Icons.Default.Block, contentDescription = null, tint = if (conversation?.isBlocked == true) appBrandColor else MaterialTheme.colorScheme.error) }
                                     )
                                 }
                             }
@@ -1043,11 +1041,12 @@ fun ChatThreadScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 12.dp)
+                    reverseLayout = true,
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 8.dp)
                 ) {
-                    // Pending Scheduled Messages Banner in Thread
+                    // Pending Scheduled Messages Banner in Thread (placed right above composer)
                     if (scheduledMessages.isNotEmpty()) {
-                        item {
+                        item(key = "scheduled_messages_banner") {
                             Surface(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
                                 shape = RoundedCornerShape(16.dp),
@@ -1138,8 +1137,8 @@ fun ChatThreadScreen(
                         key = { _, msg -> msg.messageId }
                     ) { index, message ->
                         val isFromMe = message.senderPhoneNumber == "ME"
-                        val isFirstInGroup = index == 0 || filteredMessages[index - 1].senderPhoneNumber != message.senderPhoneNumber
-                        val isLastInGroup = index == filteredMessages.size - 1 || filteredMessages[index + 1].senderPhoneNumber != message.senderPhoneNumber
+                        val isFirstInGroup = index == filteredMessages.size - 1 || filteredMessages[index + 1].senderPhoneNumber != message.senderPhoneNumber
+                        val isLastInGroup = index == 0 || filteredMessages[index - 1].senderPhoneNumber != message.senderPhoneNumber
                         val isSelected = selectedMessageIds.contains(message.messageId)
                         val isCurrentSearchMatch = isSearchActive && matchingMessages.getOrNull(currentSearchMatchIndex)?.messageId == message.messageId
 
@@ -1153,6 +1152,10 @@ fun ChatThreadScreen(
                             fontSize = appSettings.fontSize,
                             showDeliveryMarks = appSettings.deliveryReportMode in listOf("BOTH", "MARKS_ONLY") || (appSettings.deliveryReportMode == "DEFAULT" && appSettings.deliveryReports),
                             customColorHex = conversation?.customColorHex,
+                            contactName = contactDisplayName,
+                            contactPhotoUri = contactPhotoUri,
+                            userAvatarColorHex = appSettings.userAvatarColor,
+                            userName = appSettings.userName,
                             highlightQuery = searchQuery,
                             isCurrentSearchMatch = isCurrentSearchMatch,
                             isSelectionMode = isSelectionMode,
@@ -1225,7 +1228,7 @@ fun ChatThreadScreen(
                     FloatingActionButton(
                         onClick = {
                             coroutineScope.launch {
-                                listState.animateScrollToItem(filteredMessages.size - 1)
+                                listState.animateScrollToItem(0)
                             }
                         },
                         shape = CircleShape,
@@ -1616,6 +1619,17 @@ fun ChatThreadScreen(
                     )
                 }
 
+                // Phone Contacts Picker Sheet (Browse contacts on phone, mark to send)
+                if (showContactPickerSheet) {
+                    ContactPickerSheet(
+                        viewModel = viewModel,
+                        onDismiss = { showContactPickerSheet = false },
+                        onContactInserted = { text ->
+                            viewModel.updateInputText(text)
+                        }
+                    )
+                }
+
                 // Actions & Attachments Bottom Sheet (SMS Tools)
                 if (showAttachmentSheet) {
                     ModalBottomSheet(
@@ -1668,11 +1682,11 @@ fun ChatThreadScreen(
                                 )
 
                                 AttachmentGridItem(
-                                    icon = Icons.Default.ContactPage,
-                                    label = "Contact Card",
+                                    icon = Icons.Default.Contacts,
+                                    label = "Contact",
                                     onClick = {
-                                        viewModel.updateInputText("👤 Contact: $contactDisplayName (${conversation?.phoneNumber})")
                                         showAttachmentSheet = false
+                                        showContactPickerSheet = true
                                     }
                                 )
                             }

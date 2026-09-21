@@ -14,6 +14,7 @@ import com.example.data.local.entity.ScheduledMessageEntity
 import com.example.data.model.SimCardInfo
 import com.example.data.preference.AppSettings
 import com.example.data.preference.UserPreferences
+import com.example.data.repository.Contact
 import com.example.data.repository.ContactRepository
 import com.example.data.repository.MessageRepository
 import com.example.ui.util.DraftManager
@@ -48,6 +49,7 @@ class ChatViewModel(
 
     val appSettings: StateFlow<AppSettings> = userPreferences.appSettings
     val contactsMap = contactRepository.contactsMap
+    val registeredContacts: StateFlow<List<Contact>> = contactRepository.registeredContacts
 
     private val _conversation = MutableStateFlow<ConversationEntity?>(null)
     val conversation: StateFlow<ConversationEntity?> = _conversation.asStateFlow()
@@ -141,7 +143,7 @@ class ChatViewModel(
 
         viewModelScope.launch {
             _messageLimit.collectLatest { limit ->
-                messageRepository.getMessagesForConversationPaged(conversationId, limit).collect { list ->
+                messageRepository.getMessagesForConversationDesc(conversationId, limit).collect { list ->
                     _messages.value = list
                 }
             }
@@ -199,6 +201,26 @@ class ChatViewModel(
         } else {
             DraftManager.saveDraft(conversationId, text)
         }
+    }
+
+    fun saveDraftNow() {
+        val text = _inputText.value
+        if (text.isBlank()) {
+            DraftManager.clearDraft(conversationId)
+        } else {
+            DraftManager.saveDraft(conversationId, text)
+        }
+    }
+
+    fun syncContacts(context: Context) {
+        viewModelScope.launch {
+            contactRepository.syncDeviceContacts(context)
+        }
+    }
+
+    fun sendDirectText(context: Context, content: String) {
+        if (content.isBlank()) return
+        actuallyDispatchMessage(context, content, null)
     }
 
     fun appendQuickResponse(text: String) {

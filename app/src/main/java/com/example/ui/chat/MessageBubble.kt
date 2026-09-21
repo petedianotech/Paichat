@@ -73,6 +73,10 @@ fun MessageBubble(
     fontSize: String = "NORMAL",
     showDeliveryMarks: Boolean = true,
     customColorHex: String? = null,
+    contactName: String? = null,
+    contactPhotoUri: String? = null,
+    userAvatarColorHex: String? = null,
+    userName: String? = null,
     highlightQuery: String = "",
     isCurrentSearchMatch: Boolean = false,
     isSelectionMode: Boolean = false,
@@ -115,9 +119,12 @@ fun MessageBubble(
     val customColor = customColorHex?.let {
         try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
     }
+    val parsedUserColor = userAvatarColorHex?.let {
+        try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
+    }
 
     val backgroundColor = when {
-        isFromMe -> customColor ?: MaterialTheme.colorScheme.primary
+        isFromMe -> customColor ?: parsedUserColor ?: MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.surface
     }
 
@@ -177,6 +184,23 @@ fun MessageBubble(
                 }
             }
             Spacer(modifier = Modifier.width(10.dp))
+        }
+
+        // Contact Avatar on Left for Received Messages
+        if (!isFromMe) {
+            if (isLastInGroup) {
+                com.example.ui.components.ContactAvatar(
+                    name = contactName ?: message.senderPhoneNumber,
+                    phoneNumber = message.senderPhoneNumber,
+                    photoUri = contactPhotoUri,
+                    customColor = customColor,
+                    size = 28.dp,
+                    fontSize = 11.sp
+                )
+            } else {
+                Spacer(modifier = Modifier.width(28.dp))
+            }
+            Spacer(modifier = Modifier.width(6.dp))
         }
 
         Column(
@@ -398,6 +422,31 @@ fun MessageBubble(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Failed to send. Tap to retry", style = MaterialTheme.typography.labelSmall)
                 }
+            }
+        }
+
+        // User Avatar on Right for Sent Messages
+        if (isFromMe) {
+            Spacer(modifier = Modifier.width(6.dp))
+            if (isLastInGroup) {
+                val userColor = parsedUserColor ?: customColor ?: MaterialTheme.colorScheme.primary
+                val userInitial = (userName ?: "ME").trim().take(1).uppercase().ifBlank { "U" }
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(userColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = userInitial,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(28.dp))
             }
         }
     }

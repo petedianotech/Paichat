@@ -56,20 +56,7 @@ class SmsReceiver : BroadcastReceiver() {
             }
 
             val pendingResult = goAsync()
-
-            val db = PulseChatDatabase.getDatabase(context)
-            val contactRepo = ContactRepository()
-            val prefs = com.example.data.preference.UserPreferences(context)
-            val messageRepo = MessageRepository(
-                context,
-                db.conversationDao(),
-                db.messageDao(),
-                db.scheduledMessageDao(),
-                db.blockedContactDao(),
-                db.quickResponseDao(),
-                contactRepo,
-                prefs
-            )
+            val messageRepo = com.example.PulseChatApp.getMessageRepository(context)
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
