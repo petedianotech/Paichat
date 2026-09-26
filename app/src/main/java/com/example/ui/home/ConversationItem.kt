@@ -44,12 +44,15 @@ import com.example.ui.util.TimeFormatter
 @Composable
 fun ConversationItem(
     conversation: ConversationEntity,
+    displayName: String? = null,
     photoUri: String? = null,
     draftText: String? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val contactName = conversation.contactName?.takeIf { it.isNotBlank() } ?: conversation.phoneNumber
+    val contactName = displayName?.takeIf { it.isNotBlank() }
+        ?: conversation.contactName?.takeIf { it.isNotBlank() }
+        ?: conversation.phoneNumber
     val customColor = conversation.customColorHex?.let {
         try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { null }
     }

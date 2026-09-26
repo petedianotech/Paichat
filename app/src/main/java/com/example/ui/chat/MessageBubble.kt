@@ -277,7 +277,7 @@ fun MessageBubble(
                     if (detectedOtp != null) {
                         Spacer(modifier = Modifier.height(6.dp))
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier
                                 .clickable {
@@ -288,7 +288,7 @@ fun MessageBubble(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.ContentCopy,
@@ -387,7 +387,7 @@ fun MessageBubble(
             // Emoji Reaction pill
             if (!reactionEmoji.isNullOrBlank()) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
@@ -396,7 +396,7 @@ fun MessageBubble(
                 ) {
                     Text(
                         text = reactionEmoji,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         fontSize = 13.sp
                     )
                 }
@@ -409,7 +409,7 @@ fun MessageBubble(
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .testTag("retry_message_button"),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = CircleShape,
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )

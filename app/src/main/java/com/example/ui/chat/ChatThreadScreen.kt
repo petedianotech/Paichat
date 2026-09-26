@@ -799,7 +799,7 @@ fun ChatThreadScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 12.dp, vertical = 6.dp),
-                                shape = RoundedCornerShape(16.dp)
+                                shape = RoundedCornerShape(24.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -831,9 +831,9 @@ fun ChatThreadScreen(
                                                 containerColor = MaterialTheme.colorScheme.primary,
                                                 contentColor = MaterialTheme.colorScheme.onPrimary
                                             ),
-                                            shape = RoundedCornerShape(20.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                            modifier = Modifier.height(32.dp)
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(34.dp)
                                         ) {
                                             Icon(Icons.Default.Undo, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -844,7 +844,10 @@ fun ChatThreadScreen(
 
                                         IconButton(
                                             onClick = { viewModel.sendDelayedNow(context) },
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                                         ) {
                                             Icon(
                                                 Icons.AutoMirrored.Filled.Send,
@@ -871,14 +874,14 @@ fun ChatThreadScreen(
                         val currentSim = availableSims.getOrNull(selectedSimIndex)
                         if (availableSims.size > 1) {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
+                                shape = CircleShape,
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                                 modifier = Modifier
                                     .clickable { showSimPickerDialog = true }
                                     .padding(vertical = 2.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
@@ -918,9 +921,9 @@ fun ChatThreadScreen(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = 44.dp, max = 130.dp)
+                                .heightIn(min = 46.dp, max = 130.dp)
                                 .wrapContentHeight(),
-                            shape = RoundedCornerShape(22.dp),
+                            shape = RoundedCornerShape(26.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         ) {
                             Row(
@@ -931,7 +934,9 @@ fun ChatThreadScreen(
                             ) {
                                 IconButton(
                                     onClick = { showAttachmentSheet = true },
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Add,
@@ -943,7 +948,9 @@ fun ChatThreadScreen(
 
                                 IconButton(
                                     onClick = { showQuickResponseSheet = true },
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Bolt,
@@ -958,7 +965,7 @@ fun ChatThreadScreen(
                                     onValueChange = { viewModel.updateInputText(it) },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(horizontal = 6.dp, vertical = 10.dp)
+                                        .padding(horizontal = 6.dp, vertical = 11.dp)
                                         .testTag("chat_input_field"),
                                     maxLines = 5,
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -999,13 +1006,13 @@ fun ChatThreadScreen(
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
                                 modifier = Modifier
-                                    .size(44.dp)
+                                    .size(46.dp)
                                     .testTag("send_sms_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Send,
                                     contentDescription = "Send SMS",
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
 
@@ -1049,7 +1056,7 @@ fun ChatThreadScreen(
                         item(key = "scheduled_messages_banner") {
                             Surface(
                                 color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(22.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -1200,7 +1207,7 @@ fun ChatThreadScreen(
                 ) {
                     visibleDateText?.let { dateText ->
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
+                            shape = CircleShape,
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
                             tonalElevation = 4.dp,
                             shadowElevation = 2.dp
@@ -1272,6 +1279,7 @@ fun ChatThreadScreen(
                                         }
                                     }
                                 },
+                                shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                             ) {
                                 Text("Delete", color = MaterialTheme.colorScheme.onError)
@@ -1443,7 +1451,7 @@ fun ChatThreadScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .clip(RoundedCornerShape(16.dp))
                                             .clickable {
                                                 viewModel.setCustomColor(hex)
                                                 showColorPicker = false
@@ -1509,7 +1517,7 @@ fun ChatThreadScreen(
 
                             quickResponses.forEach { qr ->
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(20.dp),
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1561,11 +1569,14 @@ fun ChatThreadScreen(
                             )
                         },
                         confirmButton = {
-                            Button(onClick = {
-                                viewModel.addNewQuickResponse(newQuickResponseText)
-                                newQuickResponseText = ""
-                                showAddQuickResponseDialog = false
-                            }) {
+                            Button(
+                                onClick = {
+                                    viewModel.addNewQuickResponse(newQuickResponseText)
+                                    newQuickResponseText = ""
+                                    showAddQuickResponseDialog = false
+                                },
+                                shape = CircleShape
+                            ) {
                                 Text("Save")
                             }
                         },
@@ -1718,7 +1729,7 @@ fun ChatThreadScreen(
                         availableSims.forEachIndexed { index, sim ->
                             val isSelected = index == selectedSimIndex
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(16.dp),
                                 color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1805,7 +1816,7 @@ fun ScheduleTimePickerDialog(
                             onScheduleConfirmed(cal.timeInMillis)
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = CircleShape
                     ) {
                         Text("In 1 Hour", fontSize = 11.sp)
                     }
@@ -1822,7 +1833,7 @@ fun ScheduleTimePickerDialog(
                             onScheduleConfirmed(cal.timeInMillis)
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = CircleShape
                     ) {
                         Text("Tonight 8PM", fontSize = 11.sp)
                     }
@@ -1837,7 +1848,7 @@ fun ScheduleTimePickerDialog(
                             onScheduleConfirmed(cal.timeInMillis)
                         },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = CircleShape
                     ) {
                         Text("Tomorrow 9AM", fontSize = 11.sp)
                     }
@@ -1885,7 +1896,7 @@ fun ScheduleTimePickerDialog(
                         ).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = CircleShape
                 ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -1911,7 +1922,7 @@ fun AttachmentGridItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(18.dp))
             .clickable { onClick() }
             .padding(8.dp)
     ) {
@@ -1948,9 +1959,9 @@ fun ActionRowItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = 12.dp, horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

@@ -6,18 +6,22 @@ object AvatarUtil {
     fun getInitials(name: String?): String {
         if (name.isNullOrBlank()) return "#"
         val clean = name.trim()
-        val parts = clean.split(" ").filter { it.isNotBlank() }
-        return when {
-            parts.size >= 2 -> {
-                val first = parts[0].firstOrNull { it.isLetterOrDigit() } ?: parts[0].first()
-                val second = parts[1].firstOrNull { it.isLetterOrDigit() } ?: parts[1].first()
-                "${first.uppercaseChar()}${second.uppercaseChar()}"
+        val parts = clean.split(Regex("""\s+""")).filter { it.isNotBlank() }
+        return try {
+            when {
+                parts.size >= 2 -> {
+                    val first = parts[0].firstOrNull { it.isLetterOrDigit() } ?: parts[0].firstOrNull() ?: '#'
+                    val second = parts[1].firstOrNull { it.isLetterOrDigit() } ?: parts[1].firstOrNull() ?: '#'
+                    "${first.uppercaseChar()}${second.uppercaseChar()}"
+                }
+                parts.isNotEmpty() -> {
+                    val first = parts[0].firstOrNull { it.isLetterOrDigit() } ?: parts[0].firstOrNull() ?: '#'
+                    first.uppercaseChar().toString()
+                }
+                else -> "#"
             }
-            parts.isNotEmpty() -> {
-                val first = parts[0].firstOrNull { it.isLetterOrDigit() } ?: parts[0].first()
-                first.uppercaseChar().toString()
-            }
-            else -> "#"
+        } catch (_: Exception) {
+            "#"
         }
     }
 
@@ -37,7 +41,7 @@ object AvatarUtil {
 
     fun getAvatarColor(key: String): Color {
         val hash = key.hashCode()
-        val index = kotlin.math.abs(hash) % avatarColors.size
+        val index = (hash and 0x7FFFFFFF) % avatarColors.size
         return avatarColors[index]
     }
 }

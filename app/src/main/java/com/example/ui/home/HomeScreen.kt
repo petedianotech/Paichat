@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.MarkEmailUnread
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -82,8 +83,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import com.example.data.local.entity.ConversationEntity
 import com.example.ui.chat.ActionRowItem
+import com.example.ui.chat.saveContactToPhone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,16 +118,22 @@ fun HomeScreen(
         }
     }
 
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (checkAllSmsPermissions(context)) {
+            viewModel.onAppResume(context)
+        }
+    }
+
     var selectedConversationForMenu by remember { mutableStateOf<ConversationEntity?>(null) }
     var conversationToDelete by remember { mutableStateOf<ConversationEntity?>(null) }
     var showQuickComposeDialog by remember { mutableStateOf(false) }
     var quickComposePhone by remember { mutableStateOf("") }
     var quickComposeText by remember { mutableStateOf("") }
 
-    val pinnedConversations = conversations.filter { it.isPinned }
-    val regularConversations = conversations.filter { !it.isPinned }
-    val totalUnread = conversations.sumOf { it.unreadCount }
-    val draftsCount = drafts.values.count { it.isNotBlank() }
+    val pinnedConversations = remember(conversations) { conversations.filter { it.isPinned } }
+    val regularConversations = remember(conversations) { conversations.filter { !it.isPinned } }
+    val totalUnread = remember(conversations) { conversations.sumOf { it.unreadCount } }
+    val draftsCount = remember(drafts) { drafts.values.count { it.isNotBlank() } }
 
     Scaffold(
         modifier = Modifier
@@ -259,7 +269,7 @@ fun HomeScreen(
                                 fontWeight = if (currentFilter == HomeFilter.ALL) FontWeight.SemiBold else FontWeight.Normal
                             )
                         },
-                        shape = RoundedCornerShape(20.dp),
+                        shape = CircleShape,
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -277,7 +287,7 @@ fun HomeScreen(
                                 fontWeight = if (currentFilter == HomeFilter.UNREAD) FontWeight.SemiBold else FontWeight.Normal
                             )
                         },
-                        shape = RoundedCornerShape(20.dp),
+                        shape = CircleShape,
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -296,7 +306,7 @@ fun HomeScreen(
                                     fontWeight = if (currentFilter == HomeFilter.PINNED) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             },
-                            shape = RoundedCornerShape(20.dp),
+                            shape = CircleShape,
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -316,7 +326,7 @@ fun HomeScreen(
                                     fontWeight = if (currentFilter == HomeFilter.DRAFTS) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             },
-                            shape = RoundedCornerShape(20.dp),
+                            shape = CircleShape,
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                                 selectedContainerColor = MaterialTheme.colorScheme.error,
@@ -335,7 +345,7 @@ fun HomeScreen(
                                 fontWeight = if (currentFilter == HomeFilter.TRASH) FontWeight.SemiBold else FontWeight.Normal
                             )
                         },
-                        shape = RoundedCornerShape(20.dp),
+                        shape = CircleShape,
                         colors = FilterChipDefaults.filterChipColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             selectedContainerColor = MaterialTheme.colorScheme.error,
@@ -559,10 +569,14 @@ fun HomeScreen(
                                 items = conversations,
                                 key = { "search_conv_${it.conversationId}" }
                             ) { conversation ->
+                                val resolvedName = contactsMap[conversation.phoneNumber]?.name
+                                    ?: viewModel.getResolvedContactName(conversation.phoneNumber)
+                                    ?: conversation.contactName
                                 val photoUri = contactsMap[conversation.phoneNumber]?.photoUri 
                                     ?: viewModel.getPhotoUriForPhone(conversation.phoneNumber)
                                 ConversationItem(
                                     conversation = conversation,
+                                    displayName = resolvedName,
                                     photoUri = photoUri,
                                     draftText = drafts[conversation.conversationId],
                                     onClick = { onNavigateToChat(conversation.conversationId) },
@@ -620,8 +634,7 @@ fun HomeScreen(
                                         Spacer(modifier = Modifier.height(3.dp))
                                         val content = message.content
                                         val isFromMe = message.senderPhoneNumber == "ME"
-                                        val queryLower = searchQuery.lowercase()
-                                        val textLower = content.lowercase()
+                                        val trimmedQuery = searchQuery.trim()
                                         val annotated = buildAnnotatedString {
                                             if (isFromMe) {
                                                 withStyle(
@@ -633,26 +646,34 @@ fun HomeScreen(
                                                     append("You: ")
                                                 }
                                             }
-                                            var startIndex = 0
-                                            while (startIndex < content.length) {
-                                                val matchIndex = textLower.indexOf(queryLower, startIndex)
-                                                if (matchIndex == -1) {
-                                                    append(content.substring(startIndex))
-                                                    break
+                                            if (trimmedQuery.isEmpty()) {
+                                                append(content)
+                                            } else {
+                                                val queryLower = trimmedQuery.lowercase()
+                                                val textLower = content.lowercase()
+                                                val queryLen = trimmedQuery.length
+                                                var startIndex = 0
+                                                while (startIndex < content.length) {
+                                                    val matchIndex = textLower.indexOf(queryLower, startIndex)
+                                                    if (matchIndex == -1) {
+                                                        append(content.substring(startIndex))
+                                                        break
+                                                    }
+                                                    if (matchIndex > startIndex) {
+                                                        append(content.substring(startIndex, matchIndex))
+                                                    }
+                                                    val endIndex = (matchIndex + queryLen).coerceAtMost(content.length)
+                                                    withStyle(
+                                                        SpanStyle(
+                                                            background = MaterialTheme.colorScheme.primaryContainer,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    ) {
+                                                        append(content.substring(matchIndex, endIndex))
+                                                    }
+                                                    startIndex = if (endIndex > matchIndex) endIndex else matchIndex + 1
                                                 }
-                                                if (matchIndex > startIndex) {
-                                                    append(content.substring(startIndex, matchIndex))
-                                                }
-                                                withStyle(
-                                                    SpanStyle(
-                                                        background = MaterialTheme.colorScheme.primaryContainer,
-                                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                ) {
-                                                    append(content.substring(matchIndex, matchIndex + queryLower.length))
-                                                }
-                                                startIndex = matchIndex + queryLower.length
                                             }
                                         }
                                         Text(
@@ -699,10 +720,14 @@ fun HomeScreen(
                                 items = pinnedConversations,
                                 key = { it.conversationId }
                             ) { conversation ->
+                                val resolvedName = contactsMap[conversation.phoneNumber]?.name
+                                    ?: viewModel.getResolvedContactName(conversation.phoneNumber)
+                                    ?: conversation.contactName
                                 val photoUri = contactsMap[conversation.phoneNumber]?.photoUri 
                                     ?: viewModel.getPhotoUriForPhone(conversation.phoneNumber)
                                 SwipeableConversationItem(
                                     conversation = conversation,
+                                    displayName = resolvedName,
                                     photoUri = photoUri,
                                     draftText = drafts[conversation.conversationId],
                                     onClick = { onNavigateToChat(conversation.conversationId) },
@@ -741,10 +766,14 @@ fun HomeScreen(
                             items = regularConversations,
                             key = { it.conversationId }
                         ) { conversation ->
+                            val resolvedName = contactsMap[conversation.phoneNumber]?.name
+                                ?: viewModel.getResolvedContactName(conversation.phoneNumber)
+                                ?: conversation.contactName
                             val photoUri = contactsMap[conversation.phoneNumber]?.photoUri 
                                 ?: viewModel.getPhotoUriForPhone(conversation.phoneNumber)
                             SwipeableConversationItem(
                                 conversation = conversation,
+                                displayName = resolvedName,
                                 photoUri = photoUri,
                                 draftText = drafts[conversation.conversationId],
                                 onClick = { onNavigateToChat(conversation.conversationId) },
@@ -830,6 +859,12 @@ fun HomeScreen(
 
     // Long Press Conversation Menu Sheet
     selectedConversationForMenu?.let { conv ->
+        val menuDisplayName = contactsMap[conv.phoneNumber]?.name
+            ?: viewModel.getResolvedContactName(conv.phoneNumber)
+            ?: conv.contactName
+            ?: conv.phoneNumber
+        val isSavedContact = contactsMap[conv.phoneNumber]?.let { it.name.isNotBlank() && it.name != it.phoneNumber } ?: false
+
         ModalBottomSheet(
             onDismissRequest = { selectedConversationForMenu = null },
             sheetState = rememberModalBottomSheetState(),
@@ -841,11 +876,24 @@ fun HomeScreen(
                     .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp)
             ) {
                 Text(
-                    text = conv.contactName ?: conv.phoneNumber,
+                    text = menuDisplayName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
+
+                // Save to Contacts action for unsaved numbers
+                if (!isSavedContact && conv.phoneNumber.isNotBlank()) {
+                    ActionRowItem(
+                        icon = Icons.Default.PersonAdd,
+                        label = "Add to Contacts",
+                        tint = MaterialTheme.colorScheme.primary,
+                        onClick = {
+                            selectedConversationForMenu = null
+                            saveContactToPhone(context, conv.phoneNumber, conv.contactName)
+                        }
+                    )
+                }
 
                 // Pin / Unpin
                 ActionRowItem(
@@ -911,10 +959,14 @@ fun HomeScreen(
 
     // Delete Conversation Confirmation Dialog
     conversationToDelete?.let { conv ->
+        val deleteDisplayName = contactsMap[conv.phoneNumber]?.name
+            ?: viewModel.getResolvedContactName(conv.phoneNumber)
+            ?: conv.contactName
+            ?: conv.phoneNumber
         AlertDialog(
             onDismissRequest = { conversationToDelete = null },
             title = { Text("Delete conversation?") },
-            text = { Text("Delete all messages with ${conv.contactName ?: conv.phoneNumber}?") },
+            text = { Text("Delete all messages with $deleteDisplayName?") },
             confirmButton = {
                 TextButton(
                     onClick = {

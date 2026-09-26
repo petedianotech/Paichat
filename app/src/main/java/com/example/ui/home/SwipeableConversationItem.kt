@@ -27,6 +27,7 @@ import com.example.data.local.entity.ConversationEntity
 @Composable
 fun SwipeableConversationItem(
     conversation: ConversationEntity,
+    displayName: String? = null,
     photoUri: String? = null,
     draftText: String? = null,
     onClick: () -> Unit,
@@ -104,6 +105,7 @@ fun SwipeableConversationItem(
     ) {
         ConversationItem(
             conversation = conversation,
+            displayName = displayName,
             photoUri = photoUri,
             draftText = draftText,
             onClick = onClick,

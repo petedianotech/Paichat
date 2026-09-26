@@ -3,6 +3,8 @@ package com.example.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -13,7 +15,19 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+
+/**
+ * Modern circular/rounded M3 Shapes ensuring rounded buttons, cards, and bottom containers.
+ */
+val ModernShapes = Shapes(
+    extraSmall = RoundedCornerShape(12.dp),
+    small = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(22.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(32.dp)
+)
 
 /**
  * Solid background brush provider strictly avoiding gradients.
@@ -167,6 +181,7 @@ fun PaiChatTheme(
         MaterialTheme(
             colorScheme = baseScheme,
             typography = AppFonts.getDynamicTypography(fontFamily, fontSize),
+            shapes = ModernShapes,
             content = content
         )
     }

@@ -181,7 +181,10 @@ class SmsSyncHelper(
             for ((address, latestInfo) in latestByAddress) {
                 val existing = conversationDao.getConversationByIdDirect(address)
                 val contact = contactRepository.getContactByPhoneNumber(address)
-                val resolvedName = existing?.contactName ?: contact?.name
+                val resolvedName = contact?.name?.takeIf { it.isNotBlank() && it != address }
+                    ?: existing?.contactName?.takeIf { it.isNotBlank() && it != address }
+                    ?: contact?.name
+                    ?: existing?.contactName
 
                 val unreadDelta = unreadByAddress[address] ?: 0
                 val conv = ConversationEntity(
@@ -330,7 +333,10 @@ class SmsSyncHelper(
         for ((address, latestInfo) in latestMap) {
             val existing = existingConversations[address]
             val contact = contactRepository.getContactByPhoneNumber(address)
-            val resolvedName = existing?.contactName ?: contact?.name
+            val resolvedName = contact?.name?.takeIf { it.isNotBlank() && it != address }
+                ?: existing?.contactName?.takeIf { it.isNotBlank() && it != address }
+                ?: contact?.name
+                ?: existing?.contactName
 
             val unreadCount = unreadMap[address] ?: 0
 

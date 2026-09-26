@@ -35,6 +35,7 @@ import com.example.ui.util.NotificationHelper
 import com.example.ui.util.PhoneNumberUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -488,7 +489,14 @@ class MessageRepository(
 
         val existingConversation = conversationDao.getConversationByIdDirect(conversationId)
         val unread = (existingConversation?.unreadCount ?: 0) + 1
-        val resolvedName = senderName ?: existingConversation?.contactName ?: contactRepository.getContactByPhoneNumber(normalizedPhone)?.name ?: contactRepository.getContactByPhoneNumber(senderPhone)?.name
+        val contactFromRepo = contactRepository.getContactByPhoneNumber(normalizedPhone)
+            ?: contactRepository.getContactByPhoneNumber(senderPhone)
+        val resolvedName = senderName?.takeIf { it.isNotBlank() && it != normalizedPhone }
+            ?: contactFromRepo?.name?.takeIf { it.isNotBlank() && it != normalizedPhone }
+            ?: existingConversation?.contactName?.takeIf { it.isNotBlank() && it != normalizedPhone }
+            ?: senderName
+            ?: existingConversation?.contactName
+            ?: contactFromRepo?.name
 
         val messageSummary = when {
             mediaUrl != null && (mediaUrl.endsWith(".m4a") || mediaUrl.contains("voice_")) -> "🎵 Voice message"
@@ -572,6 +580,21 @@ class MessageRepository(
     suspend fun restoreMessages(messages: List<MessageEntity>) {
         if (messages.isNotEmpty()) {
             messageDao.insertMessages(messages)
+        }
+    }
+
+    suspend fun updateConversationContactNamesFromContacts(contactRepo: ContactRepository) = withContext(Dispatchers.IO) {
+        try {
+            val conversations = conversationDao.getAllConversationsDirect()
+            for (conv in conversations) {
+                val contact = contactRepo.getContactByPhoneNumber(conv.phoneNumber)
+                val newName = contact?.name?.takeIf { it.isNotBlank() && it != conv.phoneNumber }
+                if (newName != null && conv.contactName != newName) {
+                    conversationDao.updateContactName(conv.conversationId, newName)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

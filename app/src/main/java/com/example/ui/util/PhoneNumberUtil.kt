@@ -5,61 +5,89 @@ object PhoneNumberUtil {
     /**
      * Normalizes a phone number or contact identifier by stripping non-alphanumeric
      * characters (except leading +), removing formatting spaces, dashes, brackets.
+     * Safely preserves international E.164 formats, local formats, and alphanumeric sender IDs.
      */
     fun normalize(phone: String?): String {
         if (phone.isNullOrBlank()) return ""
         val trimmed = phone.trim()
-        
-        // Remove spaces, dashes, parentheses, keeping digits and +
-        val clean = trimmed.filter { it.isDigit() || it == '+' }
-        
-        // Extract only digits to check Malawi national number formats
-        val digits = clean.filter { it.isDigit() }
-        
-        if (digits.length == 9) {
-            // E.g., "999123456" -> "+265999123456"
+
+        // Check if alphanumeric sender (like "GOOGLE", "BANK", "AIRTEL")
+        val letters = trimmed.filter { it.isLetter() }
+        val digits = trimmed.filter { it.isDigit() }
+        val hasPlus = trimmed.startsWith("+")
+
+        if (letters.isNotEmpty() && digits.isEmpty()) {
+            return trimmed.uppercase()
+        }
+
+        // Clean digits and leading '+'
+        val clean = buildString {
+            if (hasPlus) append('+')
+            append(digits)
+        }
+
+        // Malawi (+265) format preservation for local numbers
+        if (digits.length == 9 && (digits.startsWith("8") || digits.startsWith("9"))) {
             return "+265$digits"
-        } else if (digits.length == 10 && digits.startsWith("0")) {
-            // E.g., "0999123456" -> "+265999123456" (strip leading 0)
+        } else if (digits.length == 10 && digits.startsWith("0") && (digits[1] == '8' || digits[1] == '9')) {
             return "+265${digits.substring(1)}"
         } else if (digits.length == 12 && digits.startsWith("265")) {
-            // E.g., "265999123456" or "+265999123456" -> "+265999123456"
-            return "+265${digits.substring(3)}"
+            return "+$digits"
         }
-        
-        // Fallback for short codes, services or non-Malawi numbers
-        val hasPlus = clean.startsWith("+")
-        val digitsAndLetters = clean.filter { it.isLetterOrDigit() }
-        return if (hasPlus) "+$digitsAndLetters" else digitsAndLetters
+
+        // Standard number or international format
+        return if (clean.isNotBlank()) clean else trimmed
     }
 
     /**
-     * Extracts a core phone suffix (e.g., last 7-10 digits) to allow flexible matching
-     * between local numbers (e.g. 5551234) and international numbers (+15551234).
+     * Extracts only clean digits from a phone number string.
+     */
+    fun extractDigits(phone: String?): String {
+        if (phone.isNullOrBlank()) return ""
+        return phone.filter { it.isDigit() }
+    }
+
+    /**
+     * Extracts a core phone suffix (last 7 to 9 digits) to allow flexible matching
+     * between local numbers and international numbers.
      */
     fun getComparisonKey(phone: String?): String {
-        val norm = normalize(phone)
-        val digitsOnly = norm.filter { it.isDigit() }
-        return if (digitsOnly.length > 7) {
-            digitsOnly.takeLast(7)
-        } else {
-            norm
+        val digits = extractDigits(phone)
+        return when {
+            digits.length >= 9 -> digits.takeLast(9)
+            digits.length >= 7 -> digits.takeLast(7)
+            digits.isNotEmpty() -> digits
+            else -> phone?.trim()?.lowercase() ?: ""
         }
     }
 
     /**
      * Checks if two phone numbers or address identifiers represent the same contact.
+     * Accurately handles local numbers vs international prefix, spaces, dashes, and short codes.
      */
     fun areSameContact(phone1: String?, phone2: String?): Boolean {
         if (phone1.isNullOrBlank() || phone2.isNullOrBlank()) return false
         val n1 = normalize(phone1)
         val n2 = normalize(phone2)
         if (n1.equals(n2, ignoreCase = true)) return true
-        
-        val d1 = n1.filter { it.isDigit() }
-        val d2 = n2.filter { it.isDigit() }
-        if (d1.length >= 7 && d2.length >= 7) {
-            return d1.takeLast(7) == d2.takeLast(7)
+
+        val d1 = extractDigits(phone1)
+        val d2 = extractDigits(phone2)
+        if (d1.isNotEmpty() && d1 == d2) return true
+
+        // Match international vs national format (e.g. +14155551234 vs 4155551234 or 04155551234)
+        if (d1.isNotEmpty() && d2.isNotEmpty()) {
+            if (d1.endsWith(d2) || d2.endsWith(d1)) {
+                val minLen = minOf(d1.length, d2.length)
+                if (minLen >= 7) return true
+            }
+            val matchLength = minOf(d1.length, d2.length)
+            if (matchLength >= 9 && d1.takeLast(matchLength) == d2.takeLast(matchLength)) {
+                return true
+            }
+            if ((d1.length == 7 || d2.length == 7) && d1.takeLast(7) == d2.takeLast(7)) {
+                return true
+            }
         }
         return false
     }

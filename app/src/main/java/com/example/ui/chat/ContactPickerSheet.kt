@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -201,7 +202,7 @@ fun ContactPickerSheet(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(26.dp),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
@@ -216,7 +217,7 @@ fun ContactPickerSheet(
             // Permission Request Banner if not granted
             if (!hasContactsPermission) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(18.dp),
                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -236,7 +237,7 @@ fun ContactPickerSheet(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = { permissionLauncher.launch(Manifest.permission.READ_CONTACTS) },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Text("Grant", fontSize = 12.sp)
@@ -271,10 +272,10 @@ fun ContactPickerSheet(
                     }
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(
+                        itemsIndexed(
                             items = filteredContacts,
-                            key = { it.phoneNumber + "_" + it.name }
-                        ) { contact ->
+                            key = { index, item -> "${item.phoneNumber}_${item.name}_$index" }
+                        ) { _, contact ->
                             val isMarked = markedContacts.contains(contact)
 
                             Row(
@@ -371,7 +372,7 @@ fun ContactPickerSheet(
                             }
                         },
                         enabled = hasSelection,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = CircleShape,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
@@ -398,7 +399,7 @@ fun ContactPickerSheet(
                             }
                         },
                         enabled = hasSelection,
-                        shape = RoundedCornerShape(14.dp),
+                        shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         ),

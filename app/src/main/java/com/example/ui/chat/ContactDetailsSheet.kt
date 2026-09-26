@@ -224,7 +224,7 @@ fun ContactDetailsSheet(
             // Information & Customization Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -355,7 +355,7 @@ private fun ContactQuickActionButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(CircleShape)
             .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
@@ -393,7 +393,7 @@ private fun ContactSettingRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() }
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -429,6 +429,7 @@ fun saveContactToPhone(context: Context, phoneNumber: String, contactName: Strin
             if (!contactName.isNullOrBlank()) {
                 putExtra(ContactsContract.Intents.Insert.NAME, contactName)
             }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
     } catch (_: Exception) {
@@ -438,6 +439,7 @@ fun saveContactToPhone(context: Context, phoneNumber: String, contactName: Strin
                 if (!contactName.isNullOrBlank()) {
                     putExtra(ContactsContract.Intents.Insert.NAME, contactName)
                 }
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(fallbackIntent)
         } catch (_: Exception) {

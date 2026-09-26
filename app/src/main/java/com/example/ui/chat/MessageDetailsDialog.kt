@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -153,7 +154,7 @@ fun MessageDetailsDialog(
                             clipboard.setPrimaryClip(ClipData.newPlainText("Message Details", detailsSummary))
                             Toast.makeText(context, "Details copied to clipboard", Toast.LENGTH_SHORT).show()
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = CircleShape,
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -163,7 +164,7 @@ fun MessageDetailsDialog(
 
                     Button(
                         onClick = onDismiss,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = CircleShape,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Done")

@@ -278,7 +278,7 @@ fun QuickReplyPopupScreen(
                     indication = null
                 ) { /* Intercept tap on card body so it doesn't dismiss */ }
                 .testTag("quick_reply_popup_card"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface
             ),
@@ -428,7 +428,7 @@ fun QuickReplyPopupScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 6.dp),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.secondaryContainer
                     ) {
                         Row(
@@ -545,7 +545,7 @@ fun QuickReplyPopupScreen(
                         modifier = Modifier
                             .weight(1f)
                             .testTag("quick_reply_input_field"),
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(26.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.20f),
@@ -591,7 +591,7 @@ fun QuickReplyPopupScreen(
                         },
                         enabled = replyText.isNotBlank() && !isSending,
                         modifier = Modifier
-                            .size(44.dp)
+                            .size(46.dp)
                             .clip(CircleShape)
                             .background(
                                 if (replyText.isNotBlank()) MaterialTheme.colorScheme.primary
@@ -621,10 +621,10 @@ fun PopupBubbleItem(msg: MessageEntity) {
     ) {
         Surface(
             shape = RoundedCornerShape(
-                topStart = 14.dp,
-                topEnd = 14.dp,
-                bottomStart = if (isFromMe) 14.dp else 4.dp,
-                bottomEnd = if (isFromMe) 4.dp else 14.dp
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (isFromMe) 18.dp else 6.dp,
+                bottomEnd = if (isFromMe) 6.dp else 18.dp
             ),
             color = if (isFromMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.padding(horizontal = 2.dp)

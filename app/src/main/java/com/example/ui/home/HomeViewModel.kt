@@ -53,15 +53,29 @@ class HomeViewModel(
         messageRepository.getAllConversations(),
         _searchQuery,
         _currentFilter,
-        drafts
-    ) { list, query, filter, draftMap ->
+        drafts,
+        contactRepository.contactsMap
+    ) { list, query, filter, draftMap, cMap ->
+        // Dynamically enrich conversation records with real contact names from ContactRepository
+        val enrichedList = list.map { conv ->
+            val contact = cMap[conv.phoneNumber]
+                ?: contactRepository.getContactByPhoneNumber(conv.phoneNumber)
+            val realName = contact?.name?.takeIf { it.isNotBlank() && it != conv.phoneNumber }
+            if (realName != null && conv.contactName != realName) {
+                conv.copy(contactName = realName)
+            } else {
+                conv
+            }
+        }
+
         val queryFiltered = if (query.isBlank()) {
-            list
+            enrichedList
         } else {
-            list.filter { conv ->
-                (conv.contactName?.contains(query, ignoreCase = true) == true) ||
-                        conv.phoneNumber.contains(query) ||
-                        conv.lastMessage.contains(query, ignoreCase = true)
+            val q = query.trim()
+            enrichedList.filter { conv ->
+                (conv.contactName?.contains(q, ignoreCase = true) == true) ||
+                        conv.phoneNumber.contains(q) ||
+                        conv.lastMessage.contains(q, ignoreCase = true)
             }
         }
 
@@ -95,6 +109,10 @@ class HomeViewModel(
         return contactRepository.getPhotoUriForPhoneNumber(phoneNumber)
     }
 
+    fun getResolvedContactName(phoneNumber: String): String? {
+        return contactRepository.getContactByPhoneNumber(phoneNumber)?.name
+    }
+
     init {
         // Automatically check for due scheduled messages on launch
         viewModelScope.launch {
@@ -112,10 +130,18 @@ class HomeViewModel(
 
     fun syncSmsAndContacts(context: Context) {
         viewModelScope.launch {
+            contactRepository.registerContentObserver(context)
             launch {
                 contactRepository.syncDeviceContacts(context)
             }
             messageRepository.syncDeviceSms()
+        }
+    }
+
+    fun onAppResume(context: Context) {
+        viewModelScope.launch {
+            contactRepository.registerContentObserver(context)
+            contactRepository.syncDeviceContacts(context)
         }
     }
 

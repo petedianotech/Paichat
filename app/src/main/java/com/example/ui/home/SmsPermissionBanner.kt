@@ -106,7 +106,7 @@ fun SmsPermissionBanner(
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {

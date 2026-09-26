@@ -146,7 +146,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("default_sms_card"),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                         ),
@@ -200,7 +200,7 @@ fun OnboardingScreen(
                                             defaultSmsLauncher.launch(intent)
                                         }
                                     },
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = CircleShape,
                                     modifier = Modifier.testTag("set_default_sms_button")
                                 ) {
                                     Text("Set Default", style = MaterialTheme.typography.labelSmall)
@@ -216,7 +216,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("permissions_card"),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
                         ),
@@ -274,7 +274,7 @@ fun OnboardingScreen(
                                             )
                                         )
                                     },
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = CircleShape,
                                     modifier = Modifier.testTag("grant_permissions_button")
                                 ) {
                                     Text("Grant", style = MaterialTheme.typography.labelSmall)
@@ -289,7 +289,7 @@ fun OnboardingScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 16.dp),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(22.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -357,7 +357,7 @@ fun OnboardingScreen(
                             .fillMaxWidth()
                             .height(54.dp)
                             .testTag("start_messaging_button"),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
                         )

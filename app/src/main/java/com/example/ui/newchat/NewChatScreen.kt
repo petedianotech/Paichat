@@ -153,7 +153,7 @@ fun NewChatScreen(
                                     onValueChange = { groupMessageText = it },
                                     placeholder = { Text("Type group text message...") },
                                     modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(20.dp),
+                                    shape = RoundedCornerShape(26.dp),
                                     singleLine = true
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -212,7 +212,7 @@ fun NewChatScreen(
                     placeholder = { Text("e.g. +1 555-0199") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                     singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(26.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 8.dp)
@@ -233,7 +233,7 @@ fun NewChatScreen(
                                 }
                             }
                             .testTag("start_custom_chat_card"),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(22.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         )
@@ -375,11 +375,11 @@ fun NewChatScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
 
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = CircleShape,
                                             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Icon(

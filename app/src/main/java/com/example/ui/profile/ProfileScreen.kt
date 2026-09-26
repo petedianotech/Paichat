@@ -419,7 +419,7 @@ fun ProfileScreen(
                         placeholder = { Text("Your Name or Nickname") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
 
                     OutlinedTextField(
@@ -429,7 +429,7 @@ fun ProfileScreen(
                         placeholder = { Text("e.g. Available, At work, In meetings") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
 
                     OutlinedTextField(
@@ -439,7 +439,7 @@ fun ProfileScreen(
                         placeholder = { Text("e.g. +1 555-0199") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(20.dp)
                     )
                 }
             },
@@ -452,7 +452,7 @@ fun ProfileScreen(
                         viewModel.setUserAvatarColor(selectedAvatarColor)
                         showEditProfileDialog = false
                     },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = CircleShape
                 ) {
                     Text("Save Profile")
                 }
@@ -496,7 +496,7 @@ private fun MainSettingsIndex(
                 .fillMaxWidth()
                 .clickable { onEditProfileClick() }
                 .testTag("settings_profile_card"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             ),
@@ -563,7 +563,7 @@ private fun MainSettingsIndex(
         if (!isDefaultSmsApp || !hasSmsPermission) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
             ) {
                 Row(
@@ -681,7 +681,7 @@ private fun MainSettingsIndex(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("settings_developer_credits_card"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
             ),
@@ -715,7 +715,7 @@ private fun MainSettingsIndex(
                     colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = CircleShape
                 ) {
                     Text("Visit Portfolio", style = MaterialTheme.typography.labelMedium)
                 }
@@ -1190,7 +1190,7 @@ private fun CategorySubPage(
                                             viewModel.unblockContact(blocked.phoneNumber)
                                             Toast.makeText(context, "Unblocked ${blocked.phoneNumber}", Toast.LENGTH_SHORT).show()
                                         },
-                                        shape = RoundedCornerShape(8.dp)
+                                        shape = CircleShape
                                     ) {
                                         Text("Unblock")
                                     }
@@ -1225,7 +1225,7 @@ private fun CategorySubPage(
                                         )
                                     }
                                 },
-                                shape = RoundedCornerShape(8.dp)
+                                shape = CircleShape
                             ) {
                                 Text("Sync")
                             }
@@ -1244,7 +1244,7 @@ private fun CategorySubPage(
                         trailing = {
                             Button(
                                 onClick = { viewModel.syncDeviceData(context) },
-                                shape = RoundedCornerShape(8.dp)
+                                shape = CircleShape
                             ) {
                                 Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -1272,7 +1272,7 @@ private fun CategorySubPage(
                                         val intent = viewModel.createDefaultSmsIntent(context)
                                         if (intent != null) smsRoleLauncher.launch(intent)
                                     },
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = CircleShape
                                 ) {
                                     Text("Set Default")
                                 }
@@ -1301,7 +1301,7 @@ private fun CategorySubPage(
                                             )
                                         )
                                     },
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = CircleShape
                                 ) {
                                     Text("Grant")
                                 }
@@ -1332,7 +1332,7 @@ private fun CategorySubPage(
                                             context.startActivity(viewModel.createAppSettingsIntent(context))
                                         }
                                     },
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = CircleShape
                                 ) {
                                     Text("Allow")
                                 }
@@ -1490,7 +1490,7 @@ private fun SettingsCategoryRow(
         Box(
             modifier = Modifier
                 .size(38.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
         ) {
