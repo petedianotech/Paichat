@@ -30,11 +30,24 @@ fun SwipeableConversationItem(
     displayName: String? = null,
     photoUri: String? = null,
     draftText: String? = null,
+    swipeGesturesEnabled: Boolean = true,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onToggleRead: () -> Unit,
     onDelete: () -> Unit
 ) {
+    if (!swipeGesturesEnabled) {
+        ConversationItem(
+            conversation = conversation,
+            displayName = displayName,
+            photoUri = photoUri,
+            draftText = draftText,
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+        return
+    }
+
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { dismissValue ->
             when (dismissValue) {
@@ -43,7 +56,7 @@ fun SwipeableConversationItem(
                     false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
-                    onDelete()
+                    onDelete() // MessageRepository.deleteConversation moves to Trash
                     true
                 }
                 SwipeToDismissBoxValue.Settled -> false
@@ -65,13 +78,11 @@ fun SwipeableConversationItem(
                 },
                 label = "swipe_bg_color"
             )
-
             val alignment = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
                 SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
                 SwipeToDismissBoxValue.Settled -> Alignment.Center
             }
-
             val icon = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> {
                     if (conversation.unreadCount > 0) Icons.Default.MarkEmailRead else Icons.Default.MarkEmailUnread
@@ -79,13 +90,11 @@ fun SwipeableConversationItem(
                 SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
                 SwipeToDismissBoxValue.Settled -> null
             }
-
             val iconTint = when (direction) {
                 SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.onPrimaryContainer
                 SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.onErrorContainer
                 SwipeToDismissBoxValue.Settled -> Color.Transparent
             }
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -96,7 +105,7 @@ fun SwipeableConversationItem(
                 if (icon != null) {
                     Icon(
                         imageVector = icon,
-                        contentDescription = null,
+                        contentDescription = if (direction == SwipeToDismissBoxValue.EndToStart) "Move to Trash" else null,
                         tint = iconTint
                     )
                 }
