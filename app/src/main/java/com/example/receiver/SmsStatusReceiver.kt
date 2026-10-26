@@ -38,35 +38,46 @@ class SmsStatusReceiver : BroadcastReceiver() {
                         MessageStatus.FAILED
                     }
                     messageDao.updateMessageStatus(messageId, status)
+                    Log.d("SmsStatusReceiver", "SMS_SENT for $messageId -> $status (result=$resultCodeCopy)")
                 } else if (action == "com.example.SMS_DELIVERED") {
-                    // Update status directly to DELIVERED
-                    messageDao.updateMessageStatus(messageId, MessageStatus.DELIVERED)
+                    if (resultCodeCopy == Activity.RESULT_OK) {
+                        messageDao.updateMessageStatus(messageId, MessageStatus.DELIVERED)
+                        Log.d("SmsStatusReceiver", "SMS_DELIVERED for $messageId")
 
-                    // Delivery Report Notification if customizable setting is enabled (BOTH or NOTIFICATIONS_ONLY)
-                    val settings = prefs.appSettings.value
-                    val shouldNotify = settings.deliveryReports && 
-                            (settings.deliveryReportMode in listOf("BOTH", "NOTIFICATIONS_ONLY"))
+                        val settings = prefs.appSettings.value
+                        val shouldNotify = settings.deliveryReports &&
+                                (settings.deliveryReportMode in listOf("BOTH", "NOTIFICATIONS_ONLY"))
 
-                    if (shouldNotify) {
-                        val message = messageDao.getMessageById(messageId)
-                        val recipientPhone = message?.recipientPhoneNumber
-                            ?: intent.getStringExtra("extra_recipient_phone")
-                            ?: "Recipient"
-                        val recipientName = intent.getStringExtra("extra_recipient_name")
-                        val content = message?.content ?: intent.getStringExtra("extra_content")
+                        if (shouldNotify) {
+                            val message = messageDao.getMessageById(messageId)
+                            val recipientPhone = message?.recipientPhoneNumber
+                                ?: intent.getStringExtra("extra_recipient_phone")
+                                ?: "Recipient"
+                            var resolvedName = intent.getStringExtra("extra_recipient_name")
+                            val content = message?.content
+                                ?: intent.getStringExtra("extra_content")
 
-                        // Show delivery confirmation report notification
-                        NotificationHelper.showDeliveryReportNotification(
-                            context = context,
-                            recipientPhone = recipientPhone,
-                            recipientName = recipientName,
-                            messageContent = content,
-                            durationSetting = settings.deliveryReportDuration
-                        )
+                            if (resolvedName.isNullOrBlank()) {
+                                try {
+                                    val contactRepo = com.example.PulseChatApp.getContactRepository(context)
+                                    resolvedName = contactRepo.getContactByPhoneNumber(recipientPhone)?.name
+                                } catch (_: Exception) {}
+                            }
+
+                            NotificationHelper.showDeliveryReportNotification(
+                                context = context,
+                                recipientPhone = recipientPhone,
+                                recipientName = resolvedName,
+                                messageContent = content,
+                                durationSetting = settings.deliveryReportDuration
+                            )
+                        }
+                    } else {
+                        Log.w("SmsStatusReceiver", "SMS_DELIVERED non-OK resultCode=$resultCodeCopy for $messageId")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("SmsStatusReceiver", "Failed to update status for message $messageId: ${e.message}")
+                Log.e("SmsStatusReceiver", "Failed to update status for message $messageId: ${e.message}", e)
             } finally {
                 pendingResult.finish()
             }
