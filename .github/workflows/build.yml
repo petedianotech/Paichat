@@ -32,8 +32,6 @@ jobs:
       - name: Compute version from run number
         id: version
         run: |
-          # Every workflow run gets a higher versionCode so the APK can update the installed app.
-          # Base offset keeps codes above any previous manual builds (start at 10).
           VERSION_CODE=$((10 + ${{ github.run_number }}))
           VERSION_NAME="1.1.${{ github.run_number }}"
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
@@ -45,15 +43,39 @@ jobs:
       - name: Decode release keystore from secret
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          set -e
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "ERROR: Secret KEYSTORE_BASE64 is not set. Add it under Settings > Secrets and variables > Actions."
+            echo "ERROR: Secret KEYSTORE_BASE64 is empty or not set."
+            echo "Add it at: Settings > Secrets and variables > Actions"
             exit 1
           fi
-          echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/my-upload-key.jks"
-          ls -la "$GITHUB_WORKSPACE/my-upload-key.jks"
-          # Export path for Gradle
-          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
+          if [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "ERROR: STORE_PASSWORD and KEY_PASSWORD secrets are required."
+            exit 1
+          fi
+          ALIAS="${KEY_ALIAS:-upload}"
+          # Strip whitespace/newlines that can break base64 when pasting into GitHub UI
+          CLEAN_B64=$(echo "$KEYSTORE_BASE64" | tr -d '\n\r\t ')
+          KEYSTORE_FILE="$GITHUB_WORKSPACE/my-upload-key.jks"
+          echo "$CLEAN_B64" | base64 -d > "$KEYSTORE_FILE" 2>/tmp/b64.err || echo "$CLEAN_B64" | base64 --decode > "$KEYSTORE_FILE"
+          if [ ! -s "$KEYSTORE_FILE" ]; then
+            echo "ERROR: Decoded keystore is empty. Check KEYSTORE_BASE64 secret."
+            cat /tmp/b64.err 2>/dev/null || true
+            exit 1
+          fi
+          ls -la "$KEYSTORE_FILE"
+          # Validate keystore can be opened with provided passwords
+          keytool -list -keystore "$KEYSTORE_FILE" -storepass "$STORE_PASSWORD" -alias "$ALIAS" || {
+            echo "ERROR: keytool cannot open keystore with STORE_PASSWORD / KEY_ALIAS=$ALIAS"
+            echo "Verify secrets: KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS"
+            exit 1
+          }
+          echo "KEYSTORE_PATH=$KEYSTORE_FILE" >> $GITHUB_ENV
+          echo "Keystore OK (alias=$ALIAS)"
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
@@ -67,12 +89,19 @@ jobs:
           VERSION_CODE: ${{ env.VERSION_CODE }}
           VERSION_NAME: ${{ env.VERSION_NAME }}
         run: |
+          set -e
+          echo "KEYSTORE_PATH=$KEYSTORE_PATH"
+          test -f "$KEYSTORE_PATH"
           ./gradlew assembleRelease --stacktrace --no-daemon
 
       - name: Locate and rename APK
         id: apk
         run: |
-          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          set -e
+          APK=$(find app/build/outputs/apk/release -name "*.apk" ! -name "*-unsigned.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          fi
           if [ -z "$APK" ]; then
             echo "No release APK found"
             find app/build/outputs -type f -name "*.apk" || true
@@ -82,10 +111,6 @@ jobs:
           cp "$APK" "$OUT"
           echo "apk_path=$OUT" >> $GITHUB_OUTPUT
           ls -lh "$OUT"
-          # Optional: print signing cert fingerprint for verification
-          if command -v keytool >/dev/null && command -v apksigner >/dev/null; then
-            $ANDROID_HOME/build-tools/*/apksigner verify --print-certs "$OUT" || true
-          fi
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
