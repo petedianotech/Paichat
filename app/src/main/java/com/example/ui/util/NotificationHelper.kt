@@ -7,14 +7,22 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.example.MainActivity
-import com.example.receiver.NotificationActionReceiver
 import com.example.R
+import com.example.receiver.NotificationActionReceiver
+import com.example.service.ChatHeadService
 
 object NotificationHelper {
 
@@ -26,6 +34,8 @@ object NotificationHelper {
     private const val DELIVERY_CHANNEL_NAME = "Delivery Reports"
     private const val DELIVERY_CHANNEL_DESC = "SMS delivery confirmation reports"
 
+    private const val SHORTCUT_CATEGORY = "com.aistudio.paichat.category.TEXT_SHARE_TARGET"
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val importance = NotificationManager.IMPORTANCE_HIGH
@@ -36,6 +46,9 @@ object NotificationHelper {
                 lightColor = android.graphics.Color.CYAN
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PRIVATE
                 setShowBadge(true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    setAllowBubbles(true)
+                }
             }
 
             val deliveryChannel = NotificationChannel(
@@ -74,6 +87,7 @@ object NotificationHelper {
 
         val displayName = senderName ?: senderPhone
         val notificationId = senderPhone.hashCode()
+        val shortcutId = "chat_$senderPhone"
 
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -113,6 +127,7 @@ object NotificationHelper {
             putExtra("senderPhone", senderPhone)
             putExtra("senderName", displayName)
             putExtra("initialMessage", messageText)
+            action = Intent.ACTION_VIEW
         }
         val popupPendingIntent = PendingIntent.getActivity(
             context,
@@ -151,12 +166,64 @@ object NotificationHelper {
             else -> longArrayOf(0, 250, 150, 250)
         }
 
+        val bubbleIcon = IconCompat.createWithResource(context, R.mipmap.ic_launcher)
+        var largeBitmap: android.graphics.Bitmap? = null
+        try {
+            val contactRepo = com.example.data.repository.ContactRepository()
+            val photoUriStr = contactRepo.resolveContactPhotoUri(context, senderPhone)
+            if (!photoUriStr.isNullOrBlank()) {
+                val uri = android.net.Uri.parse(photoUriStr)
+                largeBitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+                    android.graphics.ImageDecoder.decodeBitmap(source)
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        val personBuilder = Person.Builder()
+            .setName(displayName)
+            .setKey(senderPhone)
+            .setImportant(true)
+        if (largeBitmap != null) {
+            personBuilder.setIcon(IconCompat.createWithBitmap(largeBitmap))
+        }
+        val person = personBuilder.build()
+
+        // Dynamic conversation shortcut required for reliable system bubbles (Android 11+)
+        try {
+            val shortcut = ShortcutInfoCompat.Builder(context, shortcutId)
+                .setShortLabel(displayName)
+                .setLongLabel(displayName)
+                .setIcon(if (largeBitmap != null) IconCompat.createWithBitmap(largeBitmap) else bubbleIcon)
+                .setLongLived(true)
+                .setPerson(person)
+                .setCategories(setOf(SHORTCUT_CATEGORY))
+                .setIntent(
+                    Intent(context, MainActivity::class.java).apply {
+                        action = Intent.ACTION_VIEW
+                        putExtra("conversationId", senderPhone)
+                    }
+                )
+                .build()
+            ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        } catch (e: Exception) {
+            android.util.Log.w("NotificationHelper", "Shortcut push failed: ${e.message}")
+        }
+
+        val messagingStyle = NotificationCompat.MessagingStyle(person)
+            .setConversationTitle(displayName)
+            .addMessage(messageText, System.currentTimeMillis(), person)
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setColor(android.graphics.Color.parseColor("#1688F5"))
             .setContentTitle(displayName)
             .setContentText(messageText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(messageText))
+            .setStyle(messagingStyle)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
@@ -167,38 +234,32 @@ object NotificationHelper {
             .addAction(readAction)
             .setLights(android.graphics.Color.CYAN, 1000, 1000)
             .setVibrate(vibrationWave)
+            .setShortcutId(shortcutId)
+            .addPerson(person)
 
-        try {
-            val contactRepo = com.example.data.repository.ContactRepository()
-            val photoUriStr = contactRepo.resolveContactPhotoUri(context, senderPhone)
-            if (!photoUriStr.isNullOrBlank()) {
-                val uri = android.net.Uri.parse(photoUriStr)
-                val bitmap: android.graphics.Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
-                    android.graphics.ImageDecoder.decodeBitmap(source)
-                } else {
-                    @Suppress("DEPRECATION")
-                    android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                }
-                if (bitmap != null) {
-                    builder.setLargeIcon(bitmap)
-                }
-            }
-        } catch (_: Exception) {
+        if (largeBitmap != null) {
+            builder.setLargeIcon(largeBitmap)
         }
 
+        // Official system bubble (draggable on Android 11+ when user allows bubbles)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
+                val iconForBubble = if (largeBitmap != null) {
+                    IconCompat.createWithBitmap(largeBitmap)
+                } else {
+                    bubbleIcon
+                }
                 val bubbleMetadata = NotificationCompat.BubbleMetadata.Builder(
                     popupPendingIntent,
-                    androidx.core.graphics.drawable.IconCompat.createWithResource(context, com.example.R.mipmap.ic_launcher)
+                    iconForBubble
                 )
-                    .setDesiredHeight(600)
+                    .setDesiredHeight(640)
                     .setAutoExpandBubble(false)
                     .setSuppressNotification(false)
                     .build()
                 builder.setBubbleMetadata(bubbleMetadata)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.w("NotificationHelper", "BubbleMetadata failed: ${e.message}")
             }
         }
 
@@ -207,6 +268,13 @@ object NotificationHelper {
         try {
             notificationManager.notify(notificationId, notification)
         } catch (_: SecurityException) {
+        }
+
+        // Messenger-style overlay chat head (always works if user granted "Display over other apps")
+        try {
+            ChatHeadService.start(context, senderPhone, displayName, messageText)
+        } catch (e: Exception) {
+            android.util.Log.w("NotificationHelper", "ChatHead start failed: ${e.message}")
         }
     }
 
@@ -244,7 +312,6 @@ object NotificationHelper {
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                android.util.Log.w("NotificationHelper", "POST_NOTIFICATIONS not granted - skipping delivery report")
                 return
             }
         }
@@ -287,14 +354,9 @@ object NotificationHelper {
             notificationBuilder.setTimeoutAfter(10_000L)
         }
 
-        val notificationManager = NotificationManagerCompat.from(context)
         try {
-            notificationManager.notify(notificationId, notificationBuilder.build())
-            android.util.Log.d("NotificationHelper", "Delivery report shown for $displayName")
-        } catch (e: SecurityException) {
-            android.util.Log.e("NotificationHelper", "SecurityException showing delivery report: ${e.message}")
-        } catch (e: Exception) {
-            android.util.Log.e("NotificationHelper", "Failed to show delivery notification: ${e.message}")
+            NotificationManagerCompat.from(context).notify(notificationId, notificationBuilder.build())
+        } catch (_: Exception) {
         }
     }
 
@@ -370,9 +432,8 @@ object NotificationHelper {
             .addAction(retryAction)
             .addAction(cancelAction)
 
-        val notificationManager = NotificationManagerCompat.from(context)
         try {
-            notificationManager.notify(notificationId, builder.build())
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
         } catch (_: SecurityException) {
         }
     }
