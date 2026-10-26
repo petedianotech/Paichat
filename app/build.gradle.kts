@@ -17,19 +17,28 @@ android {
     applicationId = "com.aistudio.paichat.app"
     minSdk = 21
     targetSdk = 36
-    versionCode = 2
-    versionName = "1.1.0"
+
+    // Version is overridden on every CI build so each APK can update the previous install.
+    // Local builds fall back to 3 / 1.1.1 if env vars are not set.
+    val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 3
+    val ciVersionName = System.getenv("VERSION_NAME") ?: "1.1.1"
+    versionCode = ciVersionCode
+    versionName = ciVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
     create("release") {
+      // Prefer KEYSTORE_PATH (file on disk). CI writes the decoded secret there.
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      val storeFileCandidate = file(keystorePath)
+      if (storeFileCandidate.exists()) {
+        storeFile = storeFileCandidate
+        storePassword = System.getenv("STORE_PASSWORD") ?: ""
+        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+        keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: ""
+      }
     }
     val customKeystore = file("${rootDir}/debug.keystore")
     if (customKeystore.exists()) {
@@ -48,7 +57,11 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      // Only attach release signing when keystore file is present (avoids local build failure)
+      val releaseConfig = signingConfigs.findByName("release")
+      if (releaseConfig?.storeFile?.exists() == true) {
+        signingConfig = releaseConfig
+      }
     }
     debug {
       val customKeystore = file("${rootDir}/debug.keystore")
