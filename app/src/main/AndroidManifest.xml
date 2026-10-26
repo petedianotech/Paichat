@@ -13,6 +13,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
@@ -53,15 +55,19 @@
             </intent-filter>
         </activity>
 
+        <!-- Bubble / quick-reply surface: must be resizeable and documentLaunchMode for system bubbles -->
         <activity
             android:name=".ui.quickreply.QuickReplyActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:documentLaunchMode="always"
+            android:resizeableActivity="true"
             android:taskAffinity="com.example.quickreply"
             android:excludeFromRecents="true"
             android:noHistory="false"
             android:showOnLockScreen="true"
             android:turnScreenOn="true"
+            android:allowEmbedded="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/Theme.QuickReply"
             android:windowSoftInputMode="adjustResize|stateVisible" />
@@ -118,6 +124,16 @@
                 <data android:scheme="mms" />
                 <data android:scheme="mmsto" />
             </intent-filter>
+        </service>
+
+        <!-- Draggable Messenger-style chat head over other apps -->
+        <service
+            android:name=".service.ChatHeadService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="floating_chat_reply_bubble" />
         </service>
     </application>
 
