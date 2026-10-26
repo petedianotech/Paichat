@@ -1,15 +1,13 @@
-name: Build Debug APK
+name: Build Release Signed APK
 
 on:
   push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "**" ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build & Export APK
+  build-release:
+    name: Build Signed Release APK
     runs-on: ubuntu-latest
 
     steps:
@@ -31,31 +29,68 @@ jobs:
             cp .env.example .env
           fi
 
-      - name: Restore or Generate Debug Keystore
+      - name: Compute version from run number
+        id: version
         run: |
-          if [ -f "debug.keystore.base64" ] && [ ! -f "debug.keystore" ]; then
-            base64 -d debug.keystore.base64 > debug.keystore || base64 --decode debug.keystore.base64 > debug.keystore
-          elif [ ! -f "debug.keystore" ]; then
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          # Every workflow run gets a higher versionCode so the APK can update the installed app.
+          # Base offset keeps codes above any previous manual builds (start at 10).
+          VERSION_CODE=$((10 + ${{ github.run_number }}))
+          VERSION_NAME="1.1.${{ github.run_number }}"
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "Building versionName=$VERSION_NAME versionCode=$VERSION_CODE"
+
+      - name: Decode release keystore from secret
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ERROR: Secret KEYSTORE_BASE64 is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
           fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/my-upload-key.jks"
+          ls -la "$GITHUB_WORKSPACE/my-upload-key.jks"
+          # Export path for Gradle
+          echo "KEYSTORE_PATH=$GITHUB_WORKSPACE/my-upload-key.jks" >> $GITHUB_ENV
 
       - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build Release APK (signed)
+        env:
+          KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          VERSION_CODE: ${{ env.VERSION_CODE }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
         run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
+          ./gradlew assembleRelease --stacktrace --no-daemon
+
+      - name: Locate and rename APK
+        id: apk
+        run: |
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "No release APK found"
+            find app/build/outputs -type f -name "*.apk" || true
+            exit 1
+          fi
+          OUT="PaiChat-v${{ env.VERSION_NAME }}-${{ env.VERSION_CODE }}-release.apk"
+          cp "$APK" "$OUT"
+          echo "apk_path=$OUT" >> $GITHUB_OUTPUT
+          ls -lh "$OUT"
+          # Optional: print signing cert fingerprint for verification
+          if command -v keytool >/dev/null && command -v apksigner >/dev/null; then
+            $ANDROID_HOME/build-tools/*/apksigner verify --print-certs "$OUT" || true
           fi
 
-      - name: Build Debug APK
-        run: |
-          if [ -f "./gradlew" ]; then
-            ./gradlew assembleDebug --stacktrace --no-daemon
-          else
-            gradle assembleDebug --stacktrace --no-daemon
-          fi
-
-      - name: Upload Debug APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: PaiChat-Debug-APK
-          path: app/build/outputs/apk/**/*.apk
+          name: PaiChat-Release-${{ env.VERSION_NAME }}
+          path: ${{ steps.apk.outputs.apk_path }}
           if-no-files-found: error
+          retention-days: 30
